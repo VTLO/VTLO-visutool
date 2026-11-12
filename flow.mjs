@@ -22,9 +22,10 @@ const VERSION = '1.0.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const HOME = os.homedir();
 const IS_WIN = process.platform === 'win32';
-let LANG = /^fr/i.test(process.env.FLOW_LANG || process.env.LC_ALL || process.env.LC_MESSAGES || process.env.LANG || '') ? 'fr' : 'en';
+let LANG = /^en/i.test(process.env.FLOW_LANG || '') ? 'en' : 'fr'; // français par défaut ; anglais : FLOW_LANG=en ou --lang en
 const MSG = {
   en: {
+    ty_skill: 'skill', ty_command: 'command', ty_script: 'script', ty_prompt: 'prompt', ty_ref: 'document',
     plan_head: (n, m, c) => `PLAN PROPOSAL — '${n}' · mode ${m} · ${c} steps   (nothing is built until you validate)`,
     plan_next: 'Validate: flow validate   ·   adjust: flow plan … --mode seq|par   ·   drop a step: flow validate --exclude <id>   ·   cancel: flow cancel',
     why_order: 'given order', why_parallel: 'in parallel', why_context: 'context', why_after: 'after', why_stage: 'stage',
@@ -56,6 +57,7 @@ More:
 Config (optional): ~/.flow/config.json or <project>/.flow/config.json — see README.`,
   },
   fr: {
+    ty_skill: 'compétence', ty_command: 'commande', ty_script: 'script', ty_prompt: 'consigne', ty_ref: 'document',
     plan_head: (n, m, c) => `PLAN PROPOSÉ — '${n}' · mode ${m} · ${c} étapes   (rien n'est construit avant ta validation)`,
     plan_next: 'Valider : flow validate   ·   ajuster : flow plan … --mode seq|par   ·   retirer une étape : flow validate --exclude <id>   ·   annuler : flow cancel',
     why_order: 'ordre donné', why_parallel: 'en parallèle', why_context: 'contexte', why_after: 'après', why_stage: 'étape',
@@ -1035,7 +1037,7 @@ function renderPlan(pr) {
   const lines = [tr('plan_head', pr.pipeline.name, pr.mode, pr.pipeline.nodes.filter((n) => n.type !== 'ref').length)];
   pr.layers.forEach((ids, i) => ids.forEach((id, j) => {
     const n = by.get(id);
-    lines.push(` ${j === 0 ? String(i + 1).padStart(2) : '  '}. ${ids.length > 1 ? '∥' : ' '} ${n.label} (${n.type})${n.why ? `  — ${whyText(n.why)}` : ''}${pr.fresh.includes(id) ? '' : '  [existing]'}`);
+    lines.push(` ${j === 0 ? String(i + 1).padStart(2) : '  '}. ${ids.length > 1 ? '∥' : ' '} ${n.label} (${tr('ty_' + n.type)})${n.why ? `  — ${whyText(n.why)}` : ''}${pr.fresh.includes(id) ? '' : '  [existing]'}`);
   }));
   for (const u of pr.unresolved || []) lines.push(` ?  ${tr('unresolved')}: ${u.item}${u.suggestions?.length ? `  (${tr('didyou')}: ${u.suggestions.join(', ')})` : ''}`);
   lines.push(tr('plan_next'));
@@ -1175,6 +1177,7 @@ function agentBody(host, F) {
     '',
     `CLI: \`${F}\``,
     '',
+    'LANGUAGE: always answer the user in French, with simple everyday words (no jargon): say "étapes" for nodes, "enchaînement" for pipeline, "en même temps" for parallel, "assistant IA" for host CLI. Assume the user is a beginner.',
     '1. Read the user request (below).',
     `2. It names an existing, already-orchestrated pipeline (see PIPELINES in the list) → run \`${cmd} --load "<name>"\` (shown exactly as saved or as the workflow file defines it). No plan needed.`,
     `3. It names items (skills, commands, scripts, references, file paths, URLs or raw shell commands) → FIRST propose a plan: run \`${F} plan --host ${host} --items "a,b,c" --mode auto\`. This builds NOTHING; it prints the proposed plan (steps, parallel groups, why each is placed there).`,
@@ -1182,7 +1185,7 @@ function agentBody(host, F) {
     '4. MANDATORY VALIDATION: show the plan to the user in chat (compact: numbered steps, ∥ for parallel, one-line reason) and ask them to validate it (use the ask-the-user tool if you have one: Validate / Change order or mode / Remove a step / Cancel). Do NOT build, open or run anything before an explicit yes. If they want changes, re-run step 3 with adjusted items or mode (or pass `--exclude <step-id>` at validation), and show the new plan.',
     `5. Only after the explicit yes: run \`${F} validate --host ${host}\` (add \`--run\` only if they asked to run it right away). It builds the pipeline and opens the app. If they decline: \`${F} cancel\`.`,
     '6. The request is empty or vague → show the list above grouped by type (names only, compact) and ask which skills / scripts / references or which existing pipeline to use, then continue at step 3. If they prefer to pick in the app, run `' + cmd + '` (the app also requires validating the plan).',
-    '7. After validation, reply in at most 3 lines: the URL, the pipeline shape it printed, and "click a node to run it · ▶ runs everything · shift-click runs from a node".',
+    '7. After validation, reply in at most 3 lines: the URL, the pipeline shape it printed, and (in French) "clique sur une étape pour la lancer · « Tout lancer » lance tout · Maj+clic lance à partir d\'une étape".',
     `8. If asked later what happened, run \`${F} status\`.`,
     '',
     'Answer in the user\'s language (French if they write French). Never invent item names: use the list. Quote the --items value. Do not wait for the server (the command returns immediately).',

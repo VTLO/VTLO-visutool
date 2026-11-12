@@ -13,6 +13,7 @@ Chaque clic sur un nœud lance la **vraie commande** dans ton CLI (Claude Code, 
 Zéro dépendance — Node ≥ 18. Linux, macOS, Termux.
 
 ## Utilisation simple
+> Interface et messages **100 % en français par défaut** (anglais : bouton FR/EN ou `FLOW_LANG=en`). Au premier lancement, un **guide en 3 étapes** s'affiche (bouton **Aide** pour le rouvrir) ; les boutons sont explicites (« Créer mon enchaînement », « Tout lancer ») et le catalogue se coche comme une liste.
 Dans le CLI, tape `/flow` : il liste ce qu'il a trouvé et te demande quels skills / scripts / références (ou quel pipeline existant) utiliser.
 - `/flow release` → ouvre un pipeline existant (`.flow/pipelines/*.json` ou workflow agy `.md`, affiché tel quel)
 - `/flow plan-feature, lint-check, npm:test, deploy-site` → pipeline auto-orchestré (plan → build → vérif → livraison → rapport, en parallèle au sein d'une étape ; `after:` dans le SKILL.md ajoute une dépendance)

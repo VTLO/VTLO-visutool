@@ -39,6 +39,8 @@ Palette: tick items → wand = new pipeline, + = append. Free input accepts shel
     flow list [--compact|--json|--desc]   flow open [--load N|--items a,b|--import wf.md] [--mode auto|seq|par]
     flow run  [NAME|--items …] [--approve] (headless)   flow status | stop | doctor | uninstall
 
+The UI is **French by default** (EN via the FR/EN button or `FLOW_LANG=en`), with a first-run 3-step guide, plain-language labels and a tick-list catalog.
+
 **Mandatory plan validation.** Selecting items never builds a pipeline directly: a plan is *proposed* (steps, parallel groups, why each step sits where it does) and you must validate it — in the app (modal: untick a step, change the mode, Validate / Validate & run / Cancel) or in chat/terminal (`flow validate`, `flow cancel`). Existing pipelines open as-is. `--yes` pre-validates for automation and must be passed explicitly.
 
 ## How nodes execute
