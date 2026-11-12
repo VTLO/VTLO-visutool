@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>VTLO-visutool</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%2306080b'/%3E%3Cpath d='M6 8l3 8 3-8M15 6v12' stroke='%2335e8f5' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#06080b;--bg2:#0a0e13;--ink:#cfd9e2;--dim:#66737f;--faint:#2a3744;--line:#161e26;
+  --acc:#35e8f5;--acc2:#ff3fd0;--ok:#43e5a0;--err:#ff5c7a;--warn:#ffc857;
+  --mono:ui-monospace,"JetBrains Mono","SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:#000 url(/bg.jpg) center/cover no-repeat fixed;color:var(--ink);font:12px/1.5 var(--mono);-webkit-font-smoothing:antialiased;overflow:hidden}
+button,select,input,textarea{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer;padding:0}
+::selection{background:rgba(53,232,245,.25)}
+svg.ic{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+:focus-visible{outline:1px solid var(--acc);outline-offset:2px}
+
+/* header */
+body::before{content:'';position:fixed;inset:0;background:linear-gradient(180deg,rgba(4,6,9,.66),rgba(4,6,9,.78));pointer-events:none;z-index:0}
+header,#main{position:relative;z-index:1}
+header{height:46px;display:flex;align-items:center;gap:10px;padding:0 12px;border-bottom:1px solid var(--line);background:rgba(6,8,11,.55);backdrop-filter:blur(8px)}
+.brand{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.02em;user-select:none}
+.brand .bar{color:var(--acc)}
+.brand .dot{width:7px;height:7px;border-radius:50%;background:var(--faint);transition:background .3s,box-shadow .3s}
+body.running .brand .dot{background:var(--acc);box-shadow:0 0 12px var(--acc);animation:pulse 1.1s ease-in-out infinite}
+.pname{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:34vw}
+.pname b{color:var(--ink);font-weight:600}
+.sp{flex:1}
+#status{color:var(--dim);white-space:nowrap}
+.ibtn{width:32px;height:32px;display:grid;place-items:center;border:1px solid var(--line);border-radius:9px;color:var(--dim);transition:.15s}
+.ibtn:hover{border-color:var(--acc);color:var(--ink)}
+.ibtn[aria-pressed=true]{color:var(--acc);border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:rgba(53,232,245,.07)}
+.ibtn.warn[aria-pressed=true]{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 55%,transparent);background:rgba(255,200,87,.07)}
+.ibtn.go{color:var(--acc);border-color:color-mix(in srgb,var(--acc) 45%,transparent)}
+.ibtn.go:hover{background:rgba(53,232,245,.1)}
+.ibtn.stop{color:var(--err);border-color:color-mix(in srgb,var(--err) 50%,transparent)}
+.ibtn[hidden]{display:none}
+select{background:var(--bg);border:1px solid var(--line);border-radius:9px;height:32px;padding:0 8px;color:var(--ink);cursor:pointer}
+select:hover{border-color:var(--acc)}
+.hostwrap{position:relative;display:flex;align-items:center}
+.hostwrap i{position:absolute;right:-3px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--warn);display:none}
+.hostwrap.missing i{display:block}
+
+/* layout */
+#main{display:flex;height:calc(100% - 46px);position:relative}
+#pal{width:276px;flex:none;border-right:1px solid var(--line);display:flex;flex-direction:column;background:rgba(6,8,11,.62);backdrop-filter:blur(8px);transition:margin-left .22s ease}
+body.nopal #pal{margin-left:-276px}
+#center{flex:1;display:flex;flex-direction:column;min-width:0}
+#stage{flex:1;position:relative;overflow:hidden;touch-action:none;cursor:grab;min-height:120px}
+#stage.drag{cursor:grabbing}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#nodes{position:absolute;inset:0;pointer-events:none}
+#hint{position:absolute;left:14px;right:14px;bottom:10px;color:var(--dim);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+#hint b{color:var(--acc);font-weight:500}
+#empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--dim);pointer-events:none}
+#empty svg.ic{width:30px;height:30px;color:var(--acc);margin-bottom:10px;opacity:.8}
+#empty p{margin:2px 0}
+#empty[hidden]{display:none}
+#toast{position:absolute;left:50%;top:12px;transform:translate(-50%,-8px);padding:7px 12px;border:1px solid var(--faint);border-radius:9px;background:rgba(10,14,19,.96);opacity:0;pointer-events:none;transition:.25s;z-index:50;max-width:80%}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+#toast.err{border-color:var(--err);color:var(--err)}
+
+/* nodes */
+.node{--tc:var(--dim);position:absolute;left:0;top:0;width:176px;height:54px;display:flex;align-items:center;gap:10px;padding:0 12px 0 9px;border:1px solid var(--faint);border-radius:13px;background:rgba(9,13,18,.9);pointer-events:auto;cursor:pointer;user-select:none;will-change:transform;transition:border-color .2s,box-shadow .35s,background .3s}
+.node[data-type=skill]{--tc:#35e8f5}.node[data-type=command]{--tc:#ff3fd0}.node[data-type=script]{--tc:#43e5a0}.node[data-type=prompt]{--tc:#ffc857}.node[data-type=ref]{--tc:#8fa5b7}
+.node:hover{border-color:var(--tc)}
+.node .w{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;border:1px solid color-mix(in srgb,var(--tc) 38%,transparent);color:var(--tc);flex:none;background:color-mix(in srgb,var(--tc) 7%,transparent)}
+.node .t{min-width:0;flex:1}
+.node b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node i{display:block;font-style:normal;color:var(--dim);font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.node .st{width:16px;height:16px;color:var(--dim);flex:none;display:grid;place-items:center}
+.node .st svg{display:none}
+.node .bar{position:absolute;left:12px;right:12px;bottom:-1px;height:2px;border-radius:2px;overflow:hidden;display:none}
+.node .bar::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--acc),var(--acc2),transparent);background-size:60% 100%;background-repeat:no-repeat;animation:slide 1.2s linear infinite}
+.node .info{position:absolute;top:-9px;right:-9px;width:20px;height:20px;border-radius:50%;background:var(--bg2);border:1px solid var(--faint);display:grid;place-items:center;color:var(--dim);opacity:0;transition:.15s}
+.node:hover .info,.node:focus-within .info{opacity:1}
+.node .info:hover{color:var(--acc);border-color:var(--acc)}
+.node .info svg{width:11px;height:11px}
+.node.sel{box-shadow:0 0 0 1px var(--tc)}
+.node.queued{border-style:dashed}.node.queued .st .i-q{display:block}
+.node.running{border-color:var(--acc);box-shadow:0 0 0 1px rgba(53,232,245,.35),0 0 26px -6px var(--acc)}
+.node.running .bar{display:block}.node.running .st .i-run{display:block;color:var(--acc);animation:spin .9s linear infinite}
+.node.running .w svg{animation:pulse 1s ease-in-out infinite}
+.node.done{border-color:color-mix(in srgb,var(--ok) 45%,var(--faint))}.node.done .st .i-ok{display:block;color:var(--ok)}
+.node.error{border-color:var(--err)}.node.error .st .i-err{display:block;color:var(--err)}
+.node.skipped{opacity:.4}.node.skipped .st .i-skip{display:block}
+.node.stopped .st .i-stop{display:block;color:var(--warn)}
+
+/* palette */
+.ph{display:flex;gap:6px;padding:10px;border-bottom:1px solid var(--line)}
+.ph .f{position:relative;flex:1}
+.ph .f svg{position:absolute;left:9px;top:9px;width:14px;height:14px;color:var(--dim)}
+.ph input{width:100%;height:32px;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:0 10px 0 29px;outline:0}
+.ph input:focus{border-color:var(--acc)}
+#plist{flex:1;overflow:auto;padding:4px 0 8px}
+.gh{display:flex;align-items:center;gap:6px;padding:10px 12px 4px;color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.12em;cursor:pointer;user-select:none}
+.gh em{font-style:normal;color:var(--faint)}
+.gh:hover{color:var(--ink)}
+.row{display:flex;align-items:center;gap:9px;padding:5px 12px;cursor:pointer;border-left:2px solid transparent}
+.row:hover{background:rgba(255,255,255,.025)}
+.row .ri{color:var(--dim)}
+.row[data-t=skill] .ri{color:#35e8f5}.row[data-t=command] .ri{color:#ff3fd0}.row[data-t=script] .ri{color:#43e5a0}.row[data-t=prompt] .ri{color:#ffc857}.row[data-t=ref] .ri{color:#8fa5b7}.row[data-t=pipeline] .ri{color:var(--ink)}
+.row .rn{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row small{color:var(--dim);font-size:10px}
+.row.on{border-left-color:var(--acc);background:rgba(53,232,245,.06)}
+.row.cur .rn{color:var(--acc)}
+.more{padding:4px 12px;color:var(--dim);font-size:11px}
+#pf{border-top:1px solid var(--line);padding:10px;display:flex;flex-direction:column;gap:8px}
+#pf input{height:30px;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:0 10px;outline:0;width:100%}
+#pf input:focus{border-color:var(--acc)}
+#pf .r{display:flex;align-items:center;gap:6px}
+#pf .r span{flex:1;color:var(--dim)}
+#pf select{height:30px}
+
+/* drawer */
+#drawer{height:240px;border-top:1px solid var(--line);background:rgba(8,12,17,.78);backdrop-filter:blur(8px);display:flex;flex-direction:column;transition:height .2s}
+#drawer.min{height:34px}
+.dbar{height:34px;flex:none;display:flex;align-items:center;gap:4px;padding:0 8px;border-bottom:1px solid var(--line)}
+#drawer.min .dbar{border-bottom-color:transparent}
+.tab{padding:5px 10px;border-radius:7px;color:var(--dim)}
+.tab[aria-selected=true]{color:var(--ink);background:rgba(255,255,255,.05)}
+.chip{padding:3px 8px;border:1px solid var(--line);border-radius:7px;color:var(--dim);font-size:11px}
+.chip[aria-pressed=true]{color:var(--acc);border-color:color-mix(in srgb,var(--acc) 50%,transparent)}
+.mini{width:26px;height:26px;display:grid;place-items:center;border-radius:7px;color:var(--dim)}
+.mini:hover{color:var(--ink);background:rgba(255,255,255,.05)}
+#log,#detail{flex:1;overflow:auto;padding:8px 14px 12px;min-height:0}
+#drawer.min #log,#drawer.min #detail{display:none}
+#log .ln{white-space:pre-wrap;word-break:break-word;color:#aebbc7}
+#log .ln .n{display:inline-block;min-width:96px;max-width:96px;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom;white-space:nowrap;margin-right:10px}
+#log .ln.err .x{color:var(--err)}#log .ln.sys .x{color:var(--acc)}
+#log .ln.dim{opacity:.35}
+#log .none{color:var(--dim)}
+#detail label{display:block;color:var(--dim);font-size:10px;text-transform:uppercase;letter-spacing:.1em;margin:10px 0 4px}
+#detail textarea,#detail input[type=text]{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;outline:0;resize:vertical}
+#detail textarea{min-height:64px}
+#detail textarea:focus,#detail input:focus{border-color:var(--acc)}
+#detail .dh{display:flex;align-items:center;gap:8px}
+#detail .dh small{color:var(--dim)}
+#detail .checks{display:flex;flex-wrap:wrap;gap:6px}
+#detail .checks label{margin:0;display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:11px;color:var(--ink);border:1px solid var(--line);border-radius:7px;padding:3px 8px;cursor:pointer}
+#detail .acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.btn{padding:6px 12px;border:1px solid var(--line);border-radius:9px;color:var(--ink);display:inline-flex;align-items:center;gap:7px}
+.btn:hover{border-color:var(--acc)}
+.btn.p{color:var(--acc);border-color:color-mix(in srgb,var(--acc) 45%,transparent)}
+.btn.d:hover{border-color:var(--err);color:var(--err)}
+#detail pre{white-space:pre-wrap;word-break:break-word;color:#aebbc7;margin:6px 0 0;max-height:150px;overflow:auto}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{50%{opacity:.45}}
+@keyframes slide{from{background-position:-60% 0}to{background-position:160% 0}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:760px){
+  #pal{position:absolute;z-index:30;top:0;bottom:0;background:var(--bg2);width:min(86vw,300px);box-shadow:10px 0 40px rgba(0,0,0,.6)}
+  body.nopal #pal{margin-left:calc(-1 * min(86vw,300px) - 40px)}
+  .pname{display:none}#status{display:none}
+  #drawer{height:200px}
+}
+</style>
+</head>
+<body class="nopal">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 16l.7 1.8L21.5 18.5l-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></symbol>
+  <symbol id="i-slash" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M14.5 7.5l-5 9"/></symbol>
+  <symbol id="i-term" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 4 19 12 6 20 6 4"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+  <symbol id="i-wand" viewBox="0 0 24 24"><path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8L19 13M17.8 6.2L19 5M12.2 6.2L11 5"/><path d="M15 9l-12 12 2 .01L15 11z" transform="translate(0 0)"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z"/></symbol>
+  <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="9" y1="4" x2="9" y2="20"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.8" r=".6"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></symbol>
+  <symbol id="i-load" viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 1 9 9"/></symbol>
+  <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="18" cy="12" r="1"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><line x1="6" y1="12" x2="18" y2="12"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></symbol>
+</defs></svg>
+
+<header>
+  <div class="brand"><span class="dot" id="dot"></span><span>√t<span class="bar">|</span>o</span><span style="color:var(--dim);font-weight:400">VTLO-visutool</span></div>
+  <div class="pname" id="pname">—</div>
+  <div class="sp"></div>
+  <div id="status">idle</div>
+  <div class="hostwrap" id="hostwrap"><select id="host" title="CLI used to run skills / commands / prompts"><option>claude</option><option>gemini</option><option>agy</option></select><i></i></div>
+  <button class="ibtn warn" id="bApprove" aria-pressed="false" title="Auto-approve tool use in headless runs (off = agents may be blocked from editing files)"><svg class="ic"><use href="#i-shield"/></svg></button>
+  <button class="ibtn" id="bPal" aria-pressed="false" title="Palette  ( / )"><svg class="ic"><use href="#i-panel"/></svg></button>
+  <button class="ibtn go" id="bRun" title="Run the whole pipeline"><svg class="ic"><use href="#i-play"/></svg></button>
+  <button class="ibtn stop" id="bStop" title="Stop everything" hidden><svg class="ic"><use href="#i-stop"/></svg></button>
+</header>
+
+<div id="main">
+  <aside id="pal">
+    <div class="ph"><div class="f"><svg class="ic"><use href="#i-search"/></svg><input id="q" placeholder="search  ( / )" autocomplete="off" spellcheck="false"></div><button class="ibtn" id="bRescan" title="Rescan"><svg class="ic"><use href="#i-refresh"/></svg></button></div>
+    <div id="plist"></div>
+    <div id="pf">
+      <input id="raw" placeholder="+ shell command · ?agent prompt · url · path" autocomplete="off" spellcheck="false">
+      <div class="r"><span id="selc">0 selected</span>
+        <select id="mode" title="How selected items are wired"><option value="auto">auto</option><option value="seq">sequence</option><option value="par">parallel</option></select>
+        <button class="ibtn" id="bAdd" title="Append to current pipeline"><svg class="ic"><use href="#i-plus"/></svg></button>
+        <button class="ibtn go" id="bBuild" title="Build a new pipeline from selection"><svg class="ic"><use href="#i-wand"/></svg></button>
+      </div>
+    </div>
+  </aside>
+
+  <div id="center">
+    <div id="stage">
+      <canvas id="cv"></canvas>
+      <div id="nodes"></div>
+      <div id="empty"><div><svg class="ic"><use href="#i-wand"/></svg><p>no pipeline yet</p><p style="font-size:11px">select skills, scripts or references in the palette, then build</p></div></div>
+      <div id="hint"></div>
+      <div id="toast"></div>
+    </div>
+    <section id="drawer">
+      <div class="dbar">
+        <button class="tab" id="tLog" role="tab" aria-selected="true">log</button>
+        <button class="tab" id="tNode" role="tab" aria-selected="false">node</button>
+        <span class="sp"></span>
+        <button class="chip" id="fSel" aria-pressed="false" title="Only show lines of the selected node">only selected</button>
+        <button class="mini" id="bClear" title="Clear log"><svg class="ic"><use href="#i-trash"/></svg></button>
+        <button class="mini" id="bMin" title="Collapse"><svg class="ic"><use href="#i-chev"/></svg></button>
+      </div>
+      <div id="log"></div>
+      <div id="detail" hidden></div>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const ic = (id, cls = '') => `<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${id}"/></svg>`;
+const TYPE_ICON = { skill: 'spark', command: 'slash', script: 'term', prompt: 'chat', ref: 'doc', pipeline: 'layers' };
+const HOST_TAG = { claude: 'c', gemini: 'g', agy: 'a' };
+const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const TAU = Math.PI * 2;
+
+const S = { pipeline: null, states: {}, items: [], pipelines: [], host: 'claude', hosts: {}, autoApprove: false,
+  sel: null, selected: new Map(), tab: 'log', filterSel: false, startedAt: 0 };
+
+/* ───────── api ───────── */
+async function api(route, body) {
+  const r = await fetch('/api/' + route, body !== undefined
+    ? { method: 'POST', headers: { 'content-type': 'application/json', 'x-flow': '1' }, body: JSON.stringify(body) }
+    : { headers: { 'x-flow': '1' } });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+let toastT;
+function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.className = 'on' + (err ? ' err' : ''); clearTimeout(toastT); toastT = setTimeout(() => { t.className = ''; }, err ? 4200 : 2400); }
+const guard = (fn) => (...a) => Promise.resolve(fn(...a)).catch((e) => toast(e.message, true));
+
+/* ───────── state helpers ───────── */
+const nodes = () => S.pipeline?.nodes || [];
+const byId = (id) => nodes().find((n) => n.id === id);
+const status = (id) => S.states[id]?.status || 'idle';
+const isBusy = () => Object.values(S.states).some((s) => s.status === 'running' || s.status === 'queued');
+const RISKY = /\brm\s+-[a-z]*[rf]|\bsudo\b|\bmkfs|\bdd\s+if=|curl[^|\n]*\|\s*(ba|z)?sh|git\s+push|git\s+reset\s+--hard|npm\s+publish|drop\s+(table|database)|--force\b|chmod\s+-R\s+777/i;
+
+/* ───────── header ───────── */
+function renderHeader() {
+  $('#pname').innerHTML = S.pipeline ? `pipeline <b>${esc(S.pipeline.name)}</b> · ${nodes().length} nodes` : '—';
+  $('#host').value = S.host;
+  $('#hostwrap').classList.toggle('missing', S.hosts[S.host] && !S.hosts[S.host].found);
+  $('#hostwrap').title = S.hosts[S.host] && !S.hosts[S.host].found ? `'${S.hosts[S.host].bin}' not found on PATH` : '';
+  $('#bApprove').setAttribute('aria-pressed', S.autoApprove);
+  const busy = isBusy();
+  document.body.classList.toggle('running', busy);
+  $('#bRun').hidden = busy; $('#bStop').hidden = !busy;
+  const st = nodes().map((n) => status(n.id));
+  const done = st.filter((s) => s === 'done').length, err = st.filter((s) => s === 'error').length;
+  const run = st.filter((s) => s === 'running').length;
+  let text = 'idle';
+  if (busy) text = `running ${run} · ${done}/${st.length} · ${Math.max(0, Math.round((Date.now() - S.startedAt) / 1000))}s`;
+  else if (err) text = `failed ${err}/${st.length}`;
+  else if (done && done === st.length) text = `done ${done}/${st.length}`;
+  $('#status').textContent = text;
+  $('#empty').hidden = nodes().length > 0;
+}
+setInterval(() => { if (isBusy()) renderHeader(); }, 1000);
+
+/* ───────── palette ───────── */
+function renderPalette() {
+  const q = $('#q').value.trim().toLowerCase();
+  const hit = (x) => !q || x.name.toLowerCase().includes(q) || (x.desc || '').toLowerCase().includes(q);
+  const customs = [...S.selected.entries()].filter(([k]) => k.startsWith('raw:')).map(([k, v]) => ({ key: k, type: v.type === 'prompt' ? 'prompt' : v.type === 'ref' ? 'ref' : 'script', name: v.command || v.prompt || v.path || v.url, hosts: [] }));
+  const groups = [['pipeline', 'pipelines', S.pipelines.filter(hit)], ['custom', 'custom', customs], ['skill', 'skills', S.items.filter((i) => i.type === 'skill' && hit(i))],
+    ['command', 'commands', S.items.filter((i) => i.type === 'command' && hit(i))], ['script', 'scripts', S.items.filter((i) => i.type === 'script' && hit(i))], ['ref', 'references', S.items.filter((i) => i.type === 'ref' && hit(i))]];
+  let h = '';
+  for (const [t, label, arr] of groups) {
+    if (!arr.length) continue;
+    h += `<div class="gh" data-g="${t}">${label} <em>${arr.length}</em></div>`;
+    for (const x of arr.slice(0, 150)) {
+      if (t === 'pipeline') h += `<div class="row ${S.pipeline?.name === x.name ? 'cur' : ''}" data-t="pipeline" data-load="${esc(x.name)}" title="${esc(x.path || '')}">${ic('layers', 'ri')}<span class="rn">${esc(x.name)}</span><small>${x.source === 'workflow' ? 'workflow' : x.nodes + ' nodes'}</small></div>`;
+      else h += `<div class="row ${S.selected.has(x.key) ? 'on' : ''}" data-t="${x.type}" data-key="${esc(x.key)}" title="${esc(x.desc || x.name)}">${ic(TYPE_ICON[x.type], 'ri')}<span class="rn">${esc(x.name)}</span><small>${(x.hosts || []).map((k) => HOST_TAG[k] || '').join('')}</small></div>`;
+    }
+    if (arr.length > 150) h += `<div class="more">+${arr.length - 150} more — refine search</div>`;
+  }
+  $('#plist').innerHTML = h || '<div class="more" style="padding:16px 12px">nothing found. Type a shell command, file path or URL below.</div>';
+  $('#selc').textContent = `${S.selected.size} selected`;
+}
+$('#plist').addEventListener('click', guard(async (e) => {
+  const g = e.target.closest('.gh');
+  if (g && g.dataset.g !== 'pipeline' && g.dataset.g !== 'custom') {
+    const rows = [...document.querySelectorAll(`.row[data-t="${g.dataset.g}"]`)];
+    const all = rows.every((r) => S.selected.has(r.dataset.key));
+    for (const r of rows) { const it = S.items.find((i) => i.key === r.dataset.key); if (!it) continue; all ? S.selected.delete(it.key) : S.selected.set(it.key, { key: it.key }); }
+    return renderPalette();
+  }
+  const r = e.target.closest('.row');
+  if (!r) return;
+  if (r.dataset.load) { await api('open', { load: r.dataset.load }); toast(`loaded ${r.dataset.load}`); return; }
+  const key = r.dataset.key;
+  if (S.selected.has(key)) S.selected.delete(key);
+  else S.selected.set(key, key.startsWith('raw:') ? S.selected.get(key) : { key });
+  renderPalette();
+}));
+$('#q').addEventListener('input', renderPalette);
+$('#raw').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const v = e.target.value.trim(); if (!v) return;
+  const o = v.startsWith('?') ? { type: 'prompt', prompt: v.slice(1).trim() } : /^https?:\/\//i.test(v) ? { type: 'ref', url: v } : { type: 'script', command: v };
+  S.selected.set('raw:' + v, o); e.target.value = ''; renderPalette();
+});
+const build = (append) => guard(async () => {
+  const items = [...S.selected.values()];
+  if (!items.length) return toast('select some items first');
+  const r = await api('open', { items, mode: $('#mode').value, append });
+  S.selected.clear(); renderPalette();
+  const n = r.pipeline?.nodes.length || 0;
+  toast(r.unresolved?.length ? `${n} nodes · unresolved: ${r.unresolved.map((u) => u.item).join(', ')}` : `pipeline ready · ${n} nodes`, !!r.unresolved?.length);
+  if (matchMedia('(max-width:760px)').matches) document.body.classList.add('nopal');
+});
+$('#bBuild').onclick = build(false); $('#bAdd').onclick = build(true);
+$('#bRescan').onclick = guard(async () => { const r = await api('rescan', {}); S.items = r.items; S.pipelines = r.pipelines; renderPalette(); toast(`${S.items.length} items`); });
+$('#bPal').onclick = () => { document.body.classList.toggle('nopal'); $('#bPal').setAttribute('aria-pressed', !document.body.classList.contains('nopal')); setTimeout(resize, 260); };
+
+/* ───────── header controls ───────── */
+$('#host').onchange = guard(async (e) => { await api('host', { host: e.target.value }); });
+$('#bApprove').onclick = guard(async () => {
+  const on = !S.autoApprove;
+  if (on && !confirm('Auto-approve tool use for headless runs?\n\nAgents launched from this app will be able to edit files and run commands without asking.')) return;
+  await api('approve', { on });
+});
+$('#bRun').onclick = guard(async () => { if (!nodes().length) return toast('nothing to run yet'); if (!confirmRisky(nodes())) return; S.startedAt = Date.now(); await api('run', { all: true }); openLog(); });
+$('#bStop').onclick = guard(() => api('stop', {}));
+
+function confirmRisky(list) {
+  const r = list.filter((n) => n.type === 'script' && RISKY.test(n.command || ''));
+  return !r.length || confirm(`These commands look destructive:\n\n${r.map((n) => '  ' + n.command).join('\n')}\n\nRun anyway?`);
+}
+async function runNode(id, from) {
+  const n = byId(id); if (!n) return;
+  S.sel = id; markSel();
+  const st = status(id);
+  if (st === 'running' || st === 'queued') { await api('stop', { node: id }); return; }
+  if (n.type === 'ref') { selectNode(id, true); return; }
+  if (!confirmRisky(from ? nodes() : [n])) return;
+  if (!isBusy()) S.startedAt = Date.now();
+  await api('run', from ? { from: id } : { node: id });
+  openLog();
+}
+
+/* ───────── drawer ───────── */
+function setTab(t) {
+  S.tab = t;
+  $('#tLog').setAttribute('aria-selected', t === 'log'); $('#tNode').setAttribute('aria-selected', t === 'node');
+  $('#log').hidden = t !== 'log'; $('#detail').hidden = t !== 'node';
+  $('#fSel').style.display = t === 'log' ? '' : 'none'; $('#bClear').style.display = t === 'log' ? '' : 'none';
+  if (t === 'node') renderDetail();
+}
+function openLog() { $('#drawer').classList.remove('min'); setTab('log'); }
+$('#tLog').onclick = () => { $('#drawer').classList.remove('min'); setTab('log'); };
+$('#tNode').onclick = () => { $('#drawer').classList.remove('min'); setTab('node'); };
+$('#bMin').onclick = () => { $('#drawer').classList.toggle('min'); setTimeout(resize, 220); };
+$('#bClear').onclick = () => { $('#log').innerHTML = ''; };
+$('#fSel').onclick = () => { S.filterSel = !S.filterSel; $('#fSel').setAttribute('aria-pressed', S.filterSel); applyLogFilter(); };
+
+const hue = (s) => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return 170 + (h % 150); };
+let logQueue = [];
+function pushLog(l) { logQueue.push(l); }
+function flushLog() {
+  if (!logQueue.length) return;
+  const box = $('#log'); const stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+  const frag = document.createDocumentFragment();
+  for (const l of logQueue.splice(0, 400)) {
+    const d = document.createElement('div');
+    d.className = `ln ${l.s}`; d.dataset.n = l.n;
+    d.innerHTML = `<span class="n" style="color:hsl(${hue(l.n)} 70% 66%)">${esc(l.n)}</span><span class="x">${esc(l.t)}</span>`;
+    if (S.filterSel && S.sel && l.n !== S.sel) d.classList.add('dim');
+    frag.appendChild(d);
+  }
+  box.appendChild(frag);
+  while (box.childElementCount > 1500) box.firstChild.remove();
+  if (stick) box.scrollTop = box.scrollHeight;
+}
+setInterval(flushLog, 80);
+function applyLogFilter() { for (const d of $('#log').children) d.classList.toggle('dim', S.filterSel && !!S.sel && d.dataset.n !== S.sel); }
+
+/* ───────── node detail ───────── */
+function selectNode(id, show) { S.sel = id; markSel(); if (show) { $('#drawer').classList.remove('min'); setTab('node'); } else if (S.tab === 'node') renderDetail(); applyLogFilter(); }
+function markSel() { for (const el of document.querySelectorAll('.node')) el.classList.toggle('sel', el.dataset.id === S.sel); }
+async function renderDetail() {
+  const box = $('#detail'); const n = byId(S.sel);
+  if (!n) { box.innerHTML = '<div style="color:var(--dim)">Select a node (the <b>i</b> button on a node) to edit what it runs.</div>'; return; }
+  const others = nodes().filter((m) => m.id !== n.id);
+  const isScript = n.type === 'script', isRef = n.type === 'ref';
+  box.innerHTML = `<div class="dh"><span style="color:var(--acc)">${ic(TYPE_ICON[n.type])}</span><b>${esc(n.name)}</b><small>${n.type}${n.desc ? ' · ' + esc(n.desc.slice(0, 120)) : ''}</small></div>
+    ${isRef ? '<label>content</label><pre id="refpre">loading…</pre>' : `
+    <label>${isScript ? 'shell command' : 'prompt override (empty = automatic)'}</label>
+    <textarea id="dcmd" spellcheck="false" placeholder="${esc(n.preview || '')}">${esc(isScript ? n.command || '' : n.prompt || '')}</textarea>
+    ${isScript ? '' : `<label>arguments</label><input type="text" id="dargs" value="${esc(n.args || '')}" placeholder="passed to the skill / command">`}`}
+    <label>runs after</label>
+    <div class="checks">${others.length ? others.map((m) => `<label><input type="checkbox" data-need="${esc(m.id)}" ${n.needs.includes(m.id) ? 'checked' : ''}>${esc(m.label)}</label>`).join('') : '<span style="color:var(--dim)">—</span>'}</div>
+    <div class="acts">
+      ${isRef ? '' : `<button class="btn p" id="dRun">${ic('play')} run</button><button class="btn" id="dFrom">${ic('layers')} run from here</button>`}
+      <button class="btn" id="dSave">${ic('save')} save</button>
+      <button class="btn d" id="dDel">${ic('trash')} remove</button></div>`;
+  if (isRef) {
+    const pre = $('#refpre');
+    if (n.path) api('ref?path=' + encodeURIComponent(n.path)).then((r) => { pre.textContent = r.text.slice(0, 4000); }).catch(() => { pre.textContent = n.path; });
+    else pre.textContent = n.url || '';
+  }
+  const collect = () => {
+    const c = JSON.parse(JSON.stringify(S.pipeline));
+    const t = c.nodes.find((x) => x.id === n.id);
+    if (!isRef) { const v = $('#dcmd').value; if (isScript) t.command = v; else t.prompt = v; if (!isScript) t.args = $('#dargs').value; }
+    t.needs = [...box.querySelectorAll('[data-need]')].filter((i) => i.checked).map((i) => i.dataset.need);
+    return c;
+  };
+  const save = guard(async () => { await api('pipeline', { pipeline: collect() }); toast('saved'); });
+  $('#dSave').onclick = save;
+  if (!isRef) {
+    $('#dRun').onclick = guard(async () => { await api('pipeline', { pipeline: collect() }); await runNode(n.id); });
+    $('#dFrom').onclick = guard(async () => { await api('pipeline', { pipeline: collect() }); await runNode(n.id, true); });
+  }
+  $('#dDel').onclick = guard(async () => {
+    const c = JSON.parse(JSON.stringify(S.pipeline));
+    c.nodes = c.nodes.filter((x) => x.id !== n.id); c.nodes.forEach((x) => { x.needs = x.needs.filter((d) => d !== n.id); });
+    S.sel = null; await api('pipeline', { pipeline: c }); setTab('log');
+  });
+}
+
+/* ───────── 3D scene ───────── */
+const NW = 176, NH = 54, DX = 252, DY = 106, F = 1100;
+const cv = $('#cv'), ctx = cv.getContext('2d'), stage = $('#stage'), layer = $('#nodes');
+let W = 0, H = 0, DPR = 1, fit = 1;
+const cam = { yaw: 0, pitch: .34, tYaw: 0, tPitch: .34, zoom: 1, tZoom: 1, px: 0, py: 0, tpx: 0, tpy: 0, e: 0 };
+let pos = new Map(), bbox = { minX: -200, maxX: 200, minY: -100, maxY: 100 };
+const els = new Map();
+
+function layout() {
+  pos = new Map();
+  const list = nodes();
+  if (!list.length) { bbox = { minX: -220, maxX: 220, minY: -110, maxY: 110 }; return; }
+  const by = new Map(list.map((n) => [n.id, n]));
+  const lay = new Map();
+  const depth = (id) => { if (lay.has(id)) return lay.get(id); lay.set(id, 0); let d = 0; for (const q of by.get(id).needs || []) if (by.has(q)) d = Math.max(d, depth(q) + 1); lay.set(id, d); return d; };
+  list.forEach((n) => depth(n.id));
+  const L = Math.max(...lay.values()) + 1;
+  const cols = Array.from({ length: L }, () => []);
+  list.forEach((n) => cols[lay.get(n.id)].push(n));
+  const yOf = new Map();
+  cols.forEach((col, ci) => {
+    if (ci > 0) { const bary = (n) => { const ys = (n.needs || []).filter((d) => yOf.has(d)).map((d) => yOf.get(d)); return ys.length ? ys.reduce((a, b) => a + b, 0) / ys.length : 0; }; col.sort((a, b) => bary(a) - bary(b)); }
+    col.forEach((n, ri) => { const y = (ri - (col.length - 1) / 2) * DY; yOf.set(n.id, y); pos.set(n.id, { x: (ci - (L - 1) / 2) * DX, y, z: Math.round(Math.sin(ci * 1.7 + ri * 2.3) * 70), ci, ri }); });
+  });
+  const ps = [...pos.values()];
+  bbox = { minX: Math.min(...ps.map((p) => p.x)), maxX: Math.max(...ps.map((p) => p.x)), minY: Math.min(...ps.map((p) => p.y)), maxY: Math.max(...ps.map((p) => p.y)) };
+  computeFit();
+}
+function computeFit() {
+  if (!W) return;
+  const bw = bbox.maxX - bbox.minX + NW + 90, bh = bbox.maxY - bbox.minY + NH + 150;
+  fit = Math.max(.5, Math.min(1.2, Math.min(W / bw, H / bh) * .88));
+}
+function resize() {
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  W = stage.clientWidth; H = stage.clientHeight;
+  cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+  computeFit();
+}
+new ResizeObserver(resize).observe(stage);
+
+function P(x, y, z) {
+  x -= (bbox.minX + bbox.maxX) / 2; y -= (bbox.minY + bbox.maxY) / 2;
+  const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+  const x1 = x * cy + z * sy, z1 = -x * sy + z * cy;
+  const y2 = y * cp - z1 * sp, z2 = y * sp + z1 * cp;
+  const s = F / Math.max(120, F + z2), k = fit * cam.zoom * s;
+  return { x: W / 2 + cam.px + x1 * k, y: H / 2 + cam.py - 12 + y2 * k, s: k, z: z2 };
+}
+
+/* node DOM */
+function renderNodes() {
+  const list = nodes(); const seen = new Set();
+  for (const n of list) {
+    seen.add(n.id);
+    let el = els.get(n.id);
+    if (!el) {
+      el = document.createElement('div'); el.className = 'node'; el.dataset.id = n.id; el.tabIndex = 0; el.setAttribute('role', 'button');
+      el.innerHTML = `<span class="w"></span><span class="t"><b></b><i></i></span><span class="st">${ic('dots', 'i-q')}${ic('load', 'i-run')}${ic('check', 'i-ok')}${ic('x', 'i-err')}${ic('minus', 'i-skip')}${ic('stop', 'i-stop')}</span><span class="bar"></span><button class="info" title="Edit / details" tabindex="-1">${ic('info')}</button>`;
+      layer.appendChild(el); els.set(n.id, el);
+      el.addEventListener('click', (e) => { if (e.target.closest('.info')) { e.stopPropagation(); selectNode(n.id, true); return; } guard(runNode)(n.id, e.shiftKey); });
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); guard(runNode)(n.id, e.shiftKey); } else if (e.key === 'i') selectNode(n.id, true); });
+      el.addEventListener('mouseenter', () => hint(el.dataset.id)); el.addEventListener('mouseleave', () => hint(null)); el.addEventListener('focus', () => hint(el.dataset.id));
+    }
+    const cur = byId(n.id);
+    el.dataset.type = n.type;
+    el.querySelector('.w').innerHTML = ic(TYPE_ICON[n.type]);
+    el.querySelector('b').textContent = n.label;
+    el.querySelector('i').textContent = `${n.type}${n.type === 'skill' || n.type === 'command' || n.type === 'prompt' ? ' · ' + S.host : ''}`;
+    el.setAttribute('aria-label', `${n.type} ${n.label} — click to run`); el.title = n.label + (n.desc ? ' — ' + n.desc : '');
+    el.className = `node ${status(n.id)}${S.sel === n.id ? ' sel' : ''}`;
+    void cur;
+  }
+  for (const [id, el] of els) if (!seen.has(id)) { el.remove(); els.delete(id); }
+}
+function paintStates() { for (const [id, el] of els) el.className = `node ${status(id)}${S.sel === id ? ' sel' : ''}`; renderHeader(); }
+function hint(id) {
+  const n = id && byId(id);
+  $('#hint').innerHTML = n ? `<b>click</b> run · <b>shift-click</b> run from here · <b>i</b> edit &nbsp;│&nbsp; ${esc(n.preview || n.name)}` : '';
+}
+
+/* pointer: orbit / pan / zoom */
+let drag = null;
+stage.addEventListener('pointerdown', (e) => {
+  if (e.target.closest('.node')) return;
+  drag = { x: e.clientX, y: e.clientY, pan: e.shiftKey || e.button === 1 || e.button === 2 }; stage.setPointerCapture(e.pointerId); stage.classList.add('drag');
+});
+stage.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY;
+  if (drag.pan) { cam.tpx += dx; cam.tpy += dy; }
+  else { cam.tYaw = Math.max(-.85, Math.min(.85, cam.tYaw + dx * .005)); cam.tPitch = Math.max(-.05, Math.min(.75, cam.tPitch + dy * .004)); }
+});
+const endDrag = () => { drag = null; stage.classList.remove('drag'); };
+stage.addEventListener('pointerup', endDrag); stage.addEventListener('pointercancel', endDrag);
+stage.addEventListener('contextmenu', (e) => e.preventDefault());
+stage.addEventListener('wheel', (e) => { e.preventDefault(); cam.tZoom = Math.max(.45, Math.min(2.4, cam.tZoom * Math.exp(-e.deltaY * .0012))); }, { passive: false });
+stage.addEventListener('dblclick', (e) => { if (e.target.closest('.node')) return; Object.assign(cam, { tYaw: 0, tPitch: .34, tZoom: 1, tpx: 0, tpy: 0 }); });
+
+/* drawing */
+const COL = { acc: '53,232,245', acc2: '255,63,208', ok: '67,229,160', err: '255,92,122', dim: '125,150,170' };
+let cur = new Map();
+function edgePts(a, b, n = 26) {
+  const x0 = a.x + NW / 2 - 4, x1 = b.x - NW / 2 + 4, dx = Math.max(70, (x1 - x0) * .5), out = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, u = 1 - t, k0 = u * u * u, k1 = 3 * u * u * t, k2 = 3 * u * t * t, k3 = t * t * t;
+    out.push(P(k0 * x0 + k1 * (x0 + dx) + k2 * (x1 - dx) + k3 * x1, (k0 + k1) * a.y + (k2 + k3) * b.y, (k0 + k1) * a.z + (k2 + k3) * b.z));
+  }
+  return out;
+}
+const at = (pts, u) => { const f = u * (pts.length - 1), i = Math.min(pts.length - 2, Math.floor(f)), r = f - i; return { x: pts[i].x + (pts[i + 1].x - pts[i].x) * r, y: pts[i].y + (pts[i + 1].y - pts[i].y) * r, s: pts[i].s }; };
+
+function drawGrid(t) {
+  const yF = bbox.maxY + NH / 2 + 96, xr = Math.max(560, (bbox.maxX - bbox.minX) / 2 + 360);
+  const off = (t * 34 * (.15 + cam.e * 1.7)) % 140;
+  ctx.lineWidth = 1;
+  for (let z = -420; z <= 980; z += 140) {
+    const zz = z + off; if (zz > 980) continue;
+    const a = P(-xr, yF, zz), b = P(xr, yF, zz);
+    ctx.strokeStyle = `rgba(${COL.acc},${(.075 + .06 * cam.e) * Math.max(0, 1 - Math.abs(zz - 150) / 900)})`;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+  for (let x = -xr; x <= xr; x += 140) {
+    const a = P(x, yF, -420), b = P(x, yF, 980);
+    ctx.strokeStyle = `rgba(${COL.acc},${(.05 + .04 * cam.e) * Math.max(0, 1 - Math.abs(x) / xr)})`;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+}
+function drawGyro(t) {
+  const sp = 1 + cam.e * 3.4, R = Math.max(300, (bbox.maxY - bbox.minY) / 2 + 220);
+  const c = { x: (bbox.minX + bbox.maxX) / 2, y: (bbox.minY + bbox.maxY) / 2, z: 540 };
+  const base = .06 + .2 * cam.e;
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 3; i++) {
+    const rx = t * (.21 + .07 * i) * sp + i * 1.05, ry = t * (.15 - .04 * i) * sp + i * .7, r = R * (1 - .07 * i);
+    const col = i === 1 ? COL.acc2 : COL.acc;
+    ctx.strokeStyle = `rgba(${col},${base})`; ctx.beginPath();
+    for (let k = 0; k <= 72; k++) { const p = ringPt(c, r, rx, ry, k / 72 * TAU); k ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }
+    ctx.stroke();
+    if (i === 0) for (let k = 0; k < 48; k++) { const p = ringPt(c, r, rx, ry, k / 48 * TAU); ctx.fillStyle = `rgba(${col},${base * 1.6})`; ctx.fillRect(p.x - .6, p.y - .6, 1.2, 1.2); }
+    const sat = ringPt(c, r, rx, ry, t * (.7 + .3 * i) * sp);
+    ctx.fillStyle = `rgba(${col},${.25 + .6 * cam.e})`; ctx.beginPath(); ctx.arc(sat.x, sat.y, (2 + 1.5 * cam.e) * sat.s, 0, TAU); ctx.fill();
+  }
+}
+function ringPt(c, R, rx, ry, th) {
+  let x = R * Math.cos(th), y = R * Math.sin(th), z = 0;
+  let y1 = y * Math.cos(rx), z1 = y * Math.sin(rx); y = y1; z = z1;
+  const x1 = x * Math.cos(ry) + z * Math.sin(ry); z1 = -x * Math.sin(ry) + z * Math.cos(ry);
+  return P(c.x + x1, c.y + y, c.z + z1);
+}
+function drawRing(c, R, rx, ry, t, speed, col) {
+  ctx.strokeStyle = `rgba(${col},.55)`; ctx.lineWidth = 1.1; ctx.beginPath();
+  for (let i = 0; i <= 56; i++) { const p = ringPt(c, R, rx, ry, i / 56 * TAU); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }
+  ctx.stroke();
+  for (let k = 0; k < 2; k++) {
+    const p = ringPt(c, R, rx, ry, t * speed + k * Math.PI);
+    ctx.fillStyle = `rgba(${col},.18)`; ctx.beginPath(); ctx.arc(p.x, p.y, 7 * p.s, 0, TAU); ctx.fill();
+    ctx.fillStyle = `rgba(${col},1)`; ctx.beginPath(); ctx.arc(p.x, p.y, 2.4 * p.s, 0, TAU); ctx.fill();
+  }
+}
+function drawEdges(t) {
+  ctx.lineCap = 'round';
+  for (const n of nodes()) {
+    for (const d of n.needs || []) {
+      const A = cur.get(d), B = cur.get(n.id); if (!A || !B) continue;
+      const sa = status(d), sb = status(n.id), pts = edgePts(A, B), avg = (pts[0].s + pts[pts.length - 1].s) / 2;
+      let col = COL.dim, al = .34, dash = [2, 6], mode = 'idle';
+      if (sb === 'running') { col = COL.acc; al = .85; dash = []; mode = 'flow'; }
+      else if (sb === 'error' || sb === 'skipped') { col = COL.err; al = .35; dash = [3, 5]; }
+      else if (sa === 'done' && sb === 'done') { col = COL.ok; al = .5; dash = []; }
+      else if (sa === 'running') { col = COL.acc2; al = .45; dash = [4, 6]; mode = 'charge'; }
+      else if (sb === 'queued') { col = COL.acc; al = .35; dash = [4, 5]; }
+      ctx.setLineDash(dash);
+      if (mode === 'flow') { ctx.strokeStyle = `rgba(${col},.12)`; ctx.lineWidth = 6 * avg; path(pts); }
+      ctx.strokeStyle = `rgba(${col},${al})`; ctx.lineWidth = Math.max(.8, 1.2 * avg); path(pts);
+      ctx.setLineDash([]);
+      if (!RM && (mode === 'flow' || mode === 'charge')) {
+        const cnt = mode === 'flow' ? 3 : 1, spd = mode === 'flow' ? .55 : .25;
+        for (let k = 0; k < cnt; k++) {
+          const u = (t * spd + k / cnt + (d.length % 7) * .13) % 1;
+          for (let j = 0; j < 6; j++) {
+            const uu = u - j * .014; if (uu < 0) continue;
+            const p = at(pts, uu);
+            ctx.fillStyle = `rgba(${col},${(1 - j / 6) * (mode === 'flow' ? .95 : .6)})`;
+            ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(.6, (2.6 - j * .3)) * p.s, 0, TAU); ctx.fill();
+          }
+        }
+      }
+    }
+  }
+}
+function path(pts) { ctx.beginPath(); pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y))); ctx.stroke(); }
+
+let last = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (!W) { resize(); return; }
+  const t = RM ? 0 : now / 1000; const dt = Math.min(.05, (now - last) / 1000); last = now;
+  const busy = isBusy();
+  cam.e += ((busy ? 1 : 0) - cam.e) * Math.min(1, dt * 3);
+  const swayY = RM ? 0 : Math.sin(t * .27) * (.05 + .09 * cam.e), swayP = RM ? 0 : Math.sin(t * .19 + 1) * (.02 + .03 * cam.e);
+  const k = Math.min(1, dt * 7);
+  cam.yaw += (cam.tYaw + swayY - cam.yaw) * k; cam.pitch += (cam.tPitch + swayP - cam.pitch) * k;
+  cam.zoom += (cam.tZoom - cam.zoom) * k; cam.px += (cam.tpx - cam.px) * k; cam.py += (cam.tpy - cam.py) * k;
+
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, W, H);
+  // world positions with a gentle bob
+  cur = new Map();
+  for (const [id, p] of pos) cur.set(id, { x: p.x, y: p.y + (RM ? 0 : Math.sin(t * .9 + p.ci * 1.3 + p.ri) * (2.2 + 2 * cam.e)), z: p.z });
+  drawGyro(t); drawGrid(t); drawEdges(t);
+  for (const n of nodes()) {
+    const c = cur.get(n.id), s = status(n.id);
+    if (s === 'running' && !RM) { drawRing(c, 104, t * .9, t * .5, t, 2.2, COL.acc); drawRing(c, 94, 1.2 - t * .6, t * .8, t, -1.6, COL.acc2); }
+  }
+  // DOM nodes
+  for (const [id, c] of cur) {
+    const el = els.get(id); if (!el) continue;
+    const p = P(c.x, c.y, c.z);
+    el.style.transform = `translate(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px) translate(-50%,-50%) scale(${p.s.toFixed(3)})`;
+    el.style.opacity = (.5 + .5 * Math.max(0, Math.min(1, (p.s - .55) / .5))).toFixed(2);
+    el.style.zIndex = Math.round(p.s * 1000);
+  }
+}
+
+/* ───────── state sync ───────── */
+function applySettings(s) { S.host = s.host; S.hosts = s.hosts || S.hosts; S.autoApprove = s.autoApprove; renderHeader(); renderNodes(); }
+function applyPipeline(p) { S.pipeline = p; layout(); renderNodes(); renderHeader(); if (S.tab === 'node') renderDetail(); }
+async function resync() {
+  const s = await api('state');
+  S.items = s.items; S.pipelines = s.pipelines; S.states = s.states || {};
+  applySettings(s); applyPipeline(s.pipeline); renderPalette();
+  if (!s.pipeline) document.body.classList.remove('nopal');
+  $('#bPal').setAttribute('aria-pressed', !document.body.classList.contains('nopal'));
+  if (!$('#log').childElementCount) (s.logs || []).forEach(pushLog);
+}
+function connect() {
+  const es = new EventSource('/api/events');
+  es.onopen = () => resync().catch(() => {});
+  es.addEventListener('pipeline', (e) => { applyPipeline(JSON.parse(e.data)); api('state').then((s) => { S.states = s.states || {}; S.pipelines = s.pipelines; paintStates(); renderPalette(); }).catch(() => {}); });
+  es.addEventListener('settings', (e) => applySettings(JSON.parse(e.data)));
+  es.addEventListener('state', (e) => { const s = JSON.parse(e.data); const wasBusy = isBusy(); S.states[s.node] = s; if (!wasBusy && isBusy() && !S.startedAt) S.startedAt = Date.now(); paintStates(); });
+  es.addEventListener('log', (e) => pushLog(JSON.parse(e.data)));
+  es.addEventListener('run', (e) => {
+    const r = JSON.parse(e.data);
+    if (r.status === 'start') S.startedAt = Date.now();
+    else { S.startedAt = 0; toast(`${r.ok ? 'done' : 'finished with errors'} · ${Math.round(r.ms / 1000)}s`, !r.ok); renderHeader(); }
+  });
+}
+
+/* shortcuts */
+addEventListener('keydown', (e) => {
+  if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') { e.preventDefault(); document.body.classList.remove('nopal'); $('#bPal').setAttribute('aria-pressed', true); $('#q').focus(); }
+  else if (e.key === 'Escape') document.activeElement.blur?.();
+});
+
+setTab('log');
+$('#bPal').setAttribute('aria-pressed', false);
+resize(); requestAnimationFrame(frame);
+connect();
+})();
+</script>
+</body>
+</html>
