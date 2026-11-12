@@ -2,6 +2,13 @@
 
 # VTLO-visutool  (`/flow`)
 
+**Quick install (one line)**
+
+    git clone https://github.com/VTLO/VTLO-visutool && sh VTLO-visutool/install-agy.sh        # agy
+    git clone https://github.com/VTLO/VTLO-visutool && node VTLO-visutool/flow.mjs install    # claude + gemini + agy
+    curl -fsSL https://raw.githubusercontent.com/VTLO/VTLO-visutool/main/install-agy.sh | sh  # no clone needed (public repo)
+
+
 Turns any workflow, pipeline or group of skills / commands / scripts / references into a clickable 3D web app.
 Every node click runs the **real command** through your CLI (Claude Code, Gemini CLI, Antigravity `agy`).
 Zero dependencies — Node ≥ 18. Works on Linux, macOS, Termux.
