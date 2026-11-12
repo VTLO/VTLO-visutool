@@ -21,6 +21,56 @@ const VERSION = '1.0.0';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const HOME = os.homedir();
 const IS_WIN = process.platform === 'win32';
+let LANG = /^fr/i.test(process.env.FLOW_LANG || process.env.LC_ALL || process.env.LC_MESSAGES || process.env.LANG || '') ? 'fr' : 'en';
+const MSG = {
+  en: {
+    hint: 'click a node = run it · ▶ = run all · shift-click = run from there', nopipe: 'no pipeline yet — pick items in the app palette (left panel)',
+    nodes: 'nodes', unresolved: 'unresolved', didyou: 'did you mean', nobrowser: '(could not open a browser automatically — open the URL above)',
+    done: 'Done. Restart your CLI session, then type  /flow', engine: 'engine', removed: 'removed', running: 'running', nosrv: 'no flow server running — run: flow open',
+    updated: 'updated from git', noGit: 'not a git checkout: re-download the project, then run `flow install`',
+    help: (v) => `VTLO-visutool ${v} — turn any workflow / pipeline / skills into a clickable 3D web app
+
+Easy:
+  flow                          open the app (pick items in the palette)
+  flow a b "npm run x"          open a pipeline built from these skills / scripts / files / commands
+  flow go a b c                 same, and run it right away
+  flow install                  add /flow to every CLI found (claude, gemini, agy)
+  flow update                   pull the latest version and reinstall
+
+More:
+  flow open   [--load NAME] [--items a,b] [--import wf.md] [--mode auto|seq|par] [--name N] [--host H] [--run] [--no-open]
+  flow run    [NAME | --items a,b,c] [--approve]      headless, no UI
+  flow list   [--compact|--json|--desc] [--type skill,command,script,ref,pipeline]
+  flow url | status | stop | doctor | uninstall | serve [--port N]
+  --lang fr|en   language (auto from $LANG)
+
+Config (optional): ~/.flow/config.json or <project>/.flow/config.json — see README.`,
+  },
+  fr: {
+    hint: 'clic sur un nœud = l\'exécuter · ▶ = tout lancer · maj+clic = lancer à partir de là', nopipe: 'aucun pipeline — choisis des éléments dans la palette (panneau de gauche)',
+    nodes: 'nœuds', unresolved: 'introuvable', didyou: 'tu voulais dire', nobrowser: '(impossible d\'ouvrir un navigateur automatiquement — ouvre l\'URL ci-dessus)',
+    done: 'Terminé. Redémarre ta session CLI, puis tape  /flow', engine: 'moteur', removed: 'supprimé', running: 'exécution', nosrv: 'aucun serveur flow actif — lance : flow open',
+    updated: 'mis à jour depuis git', noGit: 'pas un dépôt git : retélécharge le projet puis lance `flow install`',
+    help: (v) => `VTLO-visutool ${v} — transforme n'importe quel workflow / pipeline / skills en appli web 3D cliquable
+
+Facile :
+  flow                          ouvre l'appli (choisis les éléments dans la palette)
+  flow a b "npm run x"          ouvre un pipeline construit avec ces skills / scripts / fichiers / commandes
+  flow go a b c                 pareil, et le lance tout de suite
+  flow install                  ajoute /flow à chaque CLI détecté (claude, gemini, agy)
+  flow update                   récupère la dernière version et réinstalle
+
+Plus :
+  flow open   [--load NOM] [--items a,b] [--import wf.md] [--mode auto|seq|par] [--name N] [--host H] [--run] [--no-open]
+  flow run    [NOM | --items a,b,c] [--approve]      sans interface (headless)
+  flow list   [--compact|--json|--desc] [--type skill,command,script,ref,pipeline]
+  flow url | status | stop | doctor | uninstall | serve [--port N]
+  --lang fr|en   langue (auto d'après $LANG)
+
+Config (optionnelle) : ~/.flow/config.json ou <projet>/.flow/config.json — voir le README.`,
+  },
+};
+const tr = (k, ...a) => { const v = MSG[LANG][k]; return typeof v === 'function' ? v(...a) : v; };
 const NODE_TYPES = ['skill', 'command', 'script', 'prompt', 'ref'];
 
 /* ═══════════════════════════ utils ═══════════════════════════ */
@@ -912,7 +962,7 @@ async function cmdOpen(args) {
   const spec = { host: args.host, mode: args.mode || 'auto', name: args.name, append: !!args.append };
   if (args.load) spec.load = args.load;
   else if (args.import) spec.import = args.import;
-  else spec.items = [...splitItems(args.items), ...(args._.slice(1) || [])];
+  else spec.items = [...splitItems(args.items), ...args._.slice(1).flatMap((x) => (/\s/.test(x) ? [x] : splitItems(x)))];
   const lock = await ensureServer(cwd, args);
   const r = await callServer(lock, 'POST', 'open', spec);
   if (args.run && r.pipeline) await callServer(lock, 'POST', 'run', { all: true });
@@ -922,11 +972,11 @@ async function cmdOpen(args) {
   console.log(`flow ▸ ${url}`);
   if (p) {
     const layers = pipelineShape(p);
-    console.log(`pipeline '${p.name}'  ${p.nodes.length} nodes  ${layers}`);
-  } else console.log('no pipeline yet — pick items in the app palette (left panel)');
-  for (const u of r.unresolved || []) console.log(`unresolved: ${u.item}${u.suggestions?.length ? `  (did you mean: ${u.suggestions.join(', ')})` : ''}`);
-  if (!opened && !args['no-open']) console.log('(could not open a browser automatically — open the URL above)');
-  console.log('click a node = run it · ▶ = run all · shift-click = run from there');
+    console.log(`pipeline '${p.name}'  ${p.nodes.length} ${tr('nodes')}  ${layers}`);
+  } else console.log(tr('nopipe'));
+  for (const u of r.unresolved || []) console.log(`${tr('unresolved')}: ${u.item}${u.suggestions?.length ? `  (${tr('didyou')}: ${u.suggestions.join(', ')})` : ''}`);
+  if (!opened && !args['no-open']) console.log(tr('nobrowser'));
+  console.log(tr('hint'));
 }
 function pipelineShape(p) {
   const by = new Map(p.nodes.map((n) => [n.id, n]));
@@ -1002,7 +1052,7 @@ function agentBody(host, F) {
     '5. When the command prints the URL, reply in at most 3 lines: the URL, the pipeline shape it printed, and "click a node to run it · ▶ runs everything · shift-click runs from a node".',
     `6. If asked later what happened, run \`${F} status\`.`,
     '',
-    'Never invent item names: use the list. Quote the --items value. Do not wait for the server (the command returns immediately).',
+    'Answer in the user\'s language (French if they write French). Never invent item names: use the list. Quote the --items value. Do not wait for the server (the command returns immediately).',
   ].join('\n');
 }
 
@@ -1036,50 +1086,56 @@ function renderCommand(kind, F, host) {
 function cmdInstall(args, uninstall = false) {
   const cwd = path.resolve(args.cwd || process.cwd());
   const scope = args.scope === 'project' ? 'project' : 'user';
-  const hosts = !args.host || args.host === 'all' ? ['claude', 'gemini', 'agy'] : String(args.host).split(',');
+  const found = ['claude', 'gemini', 'agy'].filter((h) => which(loadConfig(cwd).hosts[h].bin) || isDir(path.join(HOME, h === 'claude' ? '.claude' : '.gemini')));
+  const hosts = args.host === 'all' ? ['claude', 'gemini', 'agy'] : args.host ? String(args.host).split(',') : (found.length ? found : ['claude', 'gemini', 'agy']);
   const engineDir = scope === 'project' ? path.join(cwd, '.flow', 'bin') : path.join(HOME, '.flow');
   const F = `node "${path.join(engineDir, 'flow.mjs')}"`;
   if (!uninstall) {
     fs.mkdirSync(engineDir, { recursive: true });
     fs.copyFileSync(fileURLToPath(import.meta.url), path.join(engineDir, 'flow.mjs'));
     for (const a of ['ui.html', 'bg.jpg']) fs.copyFileSync(path.join(HERE, a), path.join(engineDir, a));
-    console.log(`engine → ${engineDir}`);
+    console.log(`${tr('engine')} → ${engineDir}`);
   }
   for (const t of installTargets(scope, cwd, hosts)) {
-    if (uninstall) { try { fs.unlinkSync(t.file); console.log(`removed ${t.file}`); } catch { /* absent */ } continue; }
+    if (uninstall) { try { fs.unlinkSync(t.file); console.log(`${tr('removed')} ${t.file}`); } catch { /* absent */ } continue; }
     fs.mkdirSync(path.dirname(t.file), { recursive: true });
     fs.writeFileSync(t.file, renderCommand(t.kind, F, t.host));
     console.log(`${t.host.padEnd(7)} → ${t.file}`);
   }
-  if (!uninstall) console.log('\nDone. Restart your CLI session, then type  /flow');
+  if (!uninstall) console.log('\n' + tr('done'));
 }
 
-const HELP = `VTLO-visutool ${VERSION} — materialize any workflow / pipeline / skills into a clickable 3D web app
+function cmdUpdate(args) {
+  if (!isDir(path.join(HERE, '.git'))) { console.log(tr('noGit')); return; }
+  const r = spawnSync('git', ['-C', HERE, 'pull', '--ff-only'], { stdio: 'inherit' });
+  if (r.status !== 0) throw new Error('git pull failed');
+  console.log(tr('updated'));
+  spawnSync(process.execPath, [path.join(HERE, 'flow.mjs'), 'install', ...(args.host ? ['--host', args.host] : []), ...(args.lang ? ['--lang', args.lang] : [])], { stdio: 'inherit' });
+}
 
-  flow install [--host claude,gemini,agy|all] [--scope user|project]   add the /flow slash command
-  flow open    [--load NAME] [--items a,b,c] [--import wf.md] [--mode auto|seq|par] [--name N] [--host H] [--run] [--no-open]
-  flow run     [NAME | --items a,b,c | --import wf.md] [--approve]      headless, no UI
-  flow list    [--compact|--json|--desc] [--type skill,command,script,ref,pipeline]
-  flow url | status | stop | doctor | uninstall | serve [--port N]
-
-Config (optional): ~/.flow/config.json or <project>/.flow/config.json — see README.`;
-
+const KNOWN = new Set(['list', 'open', 'go', 'run', 'status', 'doctor', 'install', 'uninstall', 'update', 'stop', 'serve', 'url', 'help']);
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const cmd = args._[0] || 'help';
+  if (args.lang === 'fr' || args.lang === 'en') LANG = args.lang;
+  if (args.help || args.h) args._.unshift('help');
+  let cmd = args._[0];
+  if (!cmd) { cmd = 'open'; args._.unshift('open'); }
+  else if (!KNOWN.has(cmd)) { cmd = 'open'; args._.unshift('open'); } // `flow a b c` = open a pipeline of a, b, c
   const cwd = path.resolve(args.cwd || process.cwd());
   switch (cmd) {
     case 'list': { const app = new App(cwd, { host: args.host }); printList(app.snapshot(), args); break; }
     case 'open': await cmdOpen(args); break;
+    case 'go': args.run = true; args._[0] = 'open'; await cmdOpen(args); break;
     case 'run': await cmdRun(args); break;
     case 'status': await cmdStatus(args); break;
     case 'doctor': cmdDoctor(args); break;
     case 'install': cmdInstall(args); break;
     case 'uninstall': cmdInstall(args, true); break;
-    case 'url': { const l = await liveLock(cwd); if (!l) { console.log('no flow server running — run: flow open'); break; } const u = `http://127.0.0.1:${l.port}/?t=${l.token}`; console.log(u); if (!args['no-open']) openBrowser(u); break; }
-    case 'stop': { const l = await liveLock(cwd); if (l) { await callServer(l, 'POST', 'shutdown', {}).catch(() => {}); console.log('stopped'); } else console.log('no server running'); break; }
+    case 'update': cmdUpdate(args); break;
+    case 'url': { const l = await liveLock(cwd); if (!l) { console.log(tr('nosrv')); break; } const u = `http://127.0.0.1:${l.port}/?t=${l.token}`; console.log(u); if (!args['no-open']) openBrowser(u); break; }
+    case 'stop': { const l = await liveLock(cwd); if (l) { await callServer(l, 'POST', 'shutdown', {}).catch(() => {}); console.log('stopped'); } else console.log(tr('nosrv')); break; }
     case 'serve': { const app = new App(cwd, { host: args.host }); const s = await serve(app, { port: Number(args.port) || 0 }); if (process.stdout.isTTY) console.log(s.url); break; }
-    default: console.log(HELP);
+    default: console.log(tr('help', VERSION));
   }
 }
 main().catch((e) => { console.error(`flow: ${e.message || e}`); process.exit(1); });

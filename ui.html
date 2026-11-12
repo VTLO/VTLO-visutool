@@ -113,8 +113,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #pf input{height:30px;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:0 10px;outline:0;width:100%}
 #pf input:focus{border-color:var(--acc)}
 #pf .r{display:flex;align-items:center;gap:6px}
-#pf .r span{flex:1;color:var(--dim)}
-#pf select{height:30px}
+#pf .r span{flex:1;min-width:0;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#pf select{height:32px;width:84px;flex:none}
+#pf .ibtn{flex:none}
 
 /* drawer */
 #drawer{height:240px;border-top:1px solid var(--line);background:rgba(8,12,17,.78);backdrop-filter:blur(8px);display:flex;flex-direction:column;transition:height .2s}
@@ -169,6 +170,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
   <symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/></symbol>
   <symbol id="i-layers" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><polygon points="13 2 4 14 12 14 11 22 20 10 12 10 13 2"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 4 19 12 6 20 6 4"/></symbol>
   <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
@@ -193,6 +195,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   <div class="pname" id="pname">—</div>
   <div class="sp"></div>
   <div id="status">idle</div>
+  <button class="ibtn" id="bLang" style="font-size:11px;font-weight:600" title="Language / Langue">FR</button>
   <div class="hostwrap" id="hostwrap"><select id="host" title="CLI used to run skills / commands / prompts"><option>claude</option><option>gemini</option><option>agy</option></select><i></i></div>
   <button class="ibtn warn" id="bApprove" aria-pressed="false" title="Auto-approve tool use in headless runs (off = agents may be blocked from editing files)"><svg class="ic"><use href="#i-shield"/></svg></button>
   <button class="ibtn" id="bPal" aria-pressed="false" title="Palette  ( / )"><svg class="ic"><use href="#i-panel"/></svg></button>
@@ -209,6 +212,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
       <div class="r"><span id="selc">0 selected</span>
         <select id="mode" title="How selected items are wired"><option value="auto">auto</option><option value="seq">sequence</option><option value="par">parallel</option></select>
         <button class="ibtn" id="bAdd" title="Append to current pipeline"><svg class="ic"><use href="#i-plus"/></svg></button>
+        <button class="ibtn go" id="bGo"><svg class="ic"><use href="#i-bolt"/></svg></button>
         <button class="ibtn go" id="bBuild" title="Build a new pipeline from selection"><svg class="ic"><use href="#i-wand"/></svg></button>
       </div>
     </div>
@@ -249,6 +253,34 @@ const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TAU = Math.PI * 2;
 
 const TOKEN = document.querySelector('meta[name=flow-token]')?.content || '';
+const L = {
+  en: { pipe: 'pipeline', nodes: 'nodes', idle: 'idle', running: 'running', failed: 'failed', done: 'done', finished_err: 'finished with errors',
+    nobin: "'{0}' not found on PATH", approveTip: 'Auto-approve tool use in headless runs (off = agents may be blocked from editing files)', palTip: 'Palette  ( / )',
+    runTip: 'Run the whole pipeline', stopTip: 'Stop everything', search: 'search  ( / )', rescanTip: 'Rescan', raw: '+ shell command · ?agent prompt · url · path',
+    modeTip: 'How selected items are wired', auto: 'auto', seq: 'sequence', par: 'parallel', addTip: 'Append to current pipeline', buildTip: 'Build a new pipeline from selection', goTip: 'Build and run in one click',
+    emptyA: 'no pipeline yet', emptyB: 'select skills, scripts or references in the palette, then build', tLog: 'log', tNode: 'node', onlySel: 'only selected', onlySelTip: 'Only show lines of the selected node',
+    clearTip: 'Clear log', minTip: 'Collapse', hostTip: 'CLI used to run skills / commands / prompts', selected: '{0} selected', g_pipeline: 'pipelines', g_custom: 'custom', g_skill: 'skills', g_command: 'commands', g_script: 'scripts', g_ref: 'references',
+    workflow: 'workflow', nNodes: '{0} nodes', more: '+{0} more — refine search', none: 'nothing found. Type a shell command, file path or URL below.', pickFirst: 'select some items first', ready: 'pipeline ready · {0} nodes', unresolved: 'unresolved',
+    items: '{0} items', loaded: 'loaded {0}', nothing: 'nothing to run yet', saved: 'saved', finishedIn: '{0} · {1}s', approveQ: 'Auto-approve tool use for headless runs?\n\nAgents launched from this app will be able to edit files and run commands without asking.',
+    risky: 'These commands look destructive:\n\n{0}\n\nRun anyway?', selNode: 'Select a node (the i button on a node) to edit what it runs.', content: 'content', loading: 'loading…', cmdLbl: 'shell command', promptLbl: 'prompt override (empty = automatic)',
+    argsLbl: 'arguments', argsPh: 'passed to the skill / command', after: 'runs after', run: 'run', runFrom: 'run from here', save: 'save', remove: 'remove', clickRun: 'click to run', hint: '<b>click</b> run · <b>shift-click</b> run from here · <b>i</b> edit', tipInfo: 'Edit / details',
+    ty_skill: 'skill', ty_command: 'command', ty_script: 'script', ty_prompt: 'prompt', ty_ref: 'ref' },
+  fr: { pipe: 'pipeline', nodes: 'nœuds', idle: 'au repos', running: 'en cours', failed: 'échec', done: 'terminé', finished_err: 'terminé avec des erreurs',
+    nobin: "'{0}' introuvable dans le PATH", approveTip: "Approuver automatiquement les outils en mode headless (désactivé = les agents peuvent être bloqués pour modifier des fichiers)", palTip: 'Palette  ( / )',
+    runTip: 'Lancer tout le pipeline', stopTip: 'Tout arrêter', search: 'rechercher  ( / )', rescanTip: 'Rescanner', raw: '+ commande shell · ?prompt agent · url · chemin',
+    modeTip: 'Comment relier les éléments choisis', auto: 'auto', seq: 'séquence', par: 'parallèle', addTip: 'Ajouter au pipeline actuel', buildTip: 'Construire un nouveau pipeline avec la sélection', goTip: 'Construire et lancer en un clic',
+    emptyA: 'aucun pipeline', emptyB: 'choisis des skills, scripts ou références dans la palette, puis construis', tLog: 'journal', tNode: 'nœud', onlySel: 'sélection seule', onlySelTip: 'Afficher seulement les lignes du nœud sélectionné',
+    clearTip: 'Vider le journal', minTip: 'Réduire', hostTip: 'CLI utilisé pour lancer skills / commandes / prompts', selected: '{0} sél.', g_pipeline: 'pipelines', g_custom: 'personnalisé', g_skill: 'skills', g_command: 'commandes', g_script: 'scripts', g_ref: 'références',
+    workflow: 'workflow', nNodes: '{0} nœuds', more: '+{0} de plus — affine la recherche', none: 'rien trouvé. Saisis une commande shell, un chemin ou une URL ci-dessous.', pickFirst: "choisis d'abord des éléments", ready: 'pipeline prêt · {0} nœuds', unresolved: 'introuvable',
+    items: '{0} éléments', loaded: '{0} chargé', nothing: 'rien à lancer pour le moment', saved: 'enregistré', finishedIn: '{0} · {1}s', approveQ: "Approuver automatiquement les outils en mode headless ?\n\nLes agents lancés depuis cette appli pourront modifier des fichiers et exécuter des commandes sans demander.",
+    risky: 'Ces commandes semblent destructrices :\n\n{0}\n\nLancer quand même ?', selNode: "Sélectionne un nœud (bouton i sur un nœud) pour modifier ce qu'il exécute.", content: 'contenu', loading: 'chargement…', cmdLbl: 'commande shell', promptLbl: 'prompt personnalisé (vide = automatique)',
+    argsLbl: 'arguments', argsPh: 'transmis au skill / à la commande', after: "s'exécute après", run: 'lancer', runFrom: "lancer à partir d'ici", save: 'enregistrer', remove: 'supprimer', clickRun: 'cliquer pour lancer', hint: '<b>clic</b> lancer · <b>maj+clic</b> lancer à partir de là · <b>i</b> modifier', tipInfo: 'Modifier / détails',
+    ty_skill: 'skill', ty_command: 'commande', ty_script: 'script', ty_prompt: 'prompt', ty_ref: 'réf' },
+};
+let LANG = 'en';
+try { LANG = localStorage.getItem('flow-lang') || ''; } catch (e) { /* storage blocked */ }
+if (LANG !== 'fr' && LANG !== 'en') LANG = /^fr/i.test(navigator.language || '') ? 'fr' : 'en';
+const t = (k, ...a) => (L[LANG][k] ?? L.en[k] ?? k).replace(/\{(\d)\}/g, (_, i) => a[+i] ?? '');
 const S = { pipeline: null, states: {}, items: [], pipelines: [], host: 'claude', hosts: {}, autoApprove: false,
   sel: null, selected: new Map(), tab: 'log', filterSel: false, startedAt: 0 };
 
@@ -274,10 +306,10 @@ const RISKY = /\brm\s+-[a-z]*[rf]|\bsudo\b|\bmkfs|\bdd\s+if=|curl[^|\n]*\|\s*(ba
 
 /* ───────── header ───────── */
 function renderHeader() {
-  $('#pname').innerHTML = S.pipeline ? `pipeline <b>${esc(S.pipeline.name)}</b> · ${nodes().length} nodes` : '—';
+  $('#pname').innerHTML = S.pipeline ? `${t('pipe')} <b>${esc(S.pipeline.name)}</b> · ${nodes().length} ${t('nodes')}` : '—';
   $('#host').value = S.host;
   $('#hostwrap').classList.toggle('missing', S.hosts[S.host] && !S.hosts[S.host].found);
-  $('#hostwrap').title = S.hosts[S.host] && !S.hosts[S.host].found ? `'${S.hosts[S.host].bin}' not found on PATH` : '';
+  $('#hostwrap').title = S.hosts[S.host] && !S.hosts[S.host].found ? t('nobin', S.hosts[S.host].bin) : '';
   $('#bApprove').setAttribute('aria-pressed', S.autoApprove);
   const busy = isBusy();
   document.body.classList.toggle('running', busy);
@@ -285,10 +317,10 @@ function renderHeader() {
   const st = nodes().map((n) => status(n.id));
   const done = st.filter((s) => s === 'done').length, err = st.filter((s) => s === 'error').length;
   const run = st.filter((s) => s === 'running').length;
-  let text = 'idle';
-  if (busy) text = `running ${run} · ${done}/${st.length} · ${Math.max(0, Math.round((Date.now() - S.startedAt) / 1000))}s`;
-  else if (err) text = `failed ${err}/${st.length}`;
-  else if (done && done === st.length) text = `done ${done}/${st.length}`;
+  let text = t('idle');
+  if (busy) text = `${t('running')} ${run} · ${done}/${st.length} · ${Math.max(0, Math.round((Date.now() - S.startedAt) / 1000))}s`;
+  else if (err) text = `${t('failed')} ${err}/${st.length}`;
+  else if (done && done === st.length) text = `${t('done')} ${done}/${st.length}`;
   $('#status').textContent = text;
   $('#empty').hidden = nodes().length > 0;
 }
@@ -299,20 +331,20 @@ function renderPalette() {
   const q = $('#q').value.trim().toLowerCase();
   const hit = (x) => !q || x.name.toLowerCase().includes(q) || (x.desc || '').toLowerCase().includes(q);
   const customs = [...S.selected.entries()].filter(([k]) => k.startsWith('raw:')).map(([k, v]) => ({ key: k, type: v.type === 'prompt' ? 'prompt' : v.type === 'ref' ? 'ref' : 'script', name: v.command || v.prompt || v.path || v.url, hosts: [] }));
-  const groups = [['pipeline', 'pipelines', S.pipelines.filter(hit)], ['custom', 'custom', customs], ['skill', 'skills', S.items.filter((i) => i.type === 'skill' && hit(i))],
-    ['command', 'commands', S.items.filter((i) => i.type === 'command' && hit(i))], ['script', 'scripts', S.items.filter((i) => i.type === 'script' && hit(i))], ['ref', 'references', S.items.filter((i) => i.type === 'ref' && hit(i))]];
+  const groups = [['pipeline', t('g_pipeline'), S.pipelines.filter(hit)], ['custom', t('g_custom'), customs], ['skill', t('g_skill'), S.items.filter((i) => i.type === 'skill' && hit(i))],
+    ['command', t('g_command'), S.items.filter((i) => i.type === 'command' && hit(i))], ['script', t('g_script'), S.items.filter((i) => i.type === 'script' && hit(i))], ['ref', t('g_ref'), S.items.filter((i) => i.type === 'ref' && hit(i))]];
   let h = '';
-  for (const [t, label, arr] of groups) {
+  for (const [gt, label, arr] of groups) {
     if (!arr.length) continue;
-    h += `<div class="gh" data-g="${t}">${label} <em>${arr.length}</em></div>`;
+    h += `<div class="gh" data-g="${gt}">${label} <em>${arr.length}</em></div>`;
     for (const x of arr.slice(0, 150)) {
-      if (t === 'pipeline') h += `<div class="row ${S.pipeline?.name === x.name ? 'cur' : ''}" data-t="pipeline" data-load="${esc(x.name)}" title="${esc(x.path || '')}">${ic('layers', 'ri')}<span class="rn">${esc(x.name)}</span><small>${x.source === 'workflow' ? 'workflow' : x.nodes + ' nodes'}</small></div>`;
+      if (gt === 'pipeline') h += `<div class="row ${S.pipeline?.name === x.name ? 'cur' : ''}" data-t="pipeline" data-load="${esc(x.name)}" title="${esc(x.path || '')}">${ic('layers', 'ri')}<span class="rn">${esc(x.name)}</span><small>${x.source === 'workflow' ? t('workflow') : t('nNodes', x.nodes)}</small></div>`;
       else h += `<div class="row ${S.selected.has(x.key) ? 'on' : ''}" data-t="${x.type}" data-key="${esc(x.key)}" title="${esc(x.desc || x.name)}">${ic(TYPE_ICON[x.type], 'ri')}<span class="rn">${esc(x.name)}</span><small>${(x.hosts || []).map((k) => HOST_TAG[k] || '').join('')}</small></div>`;
     }
-    if (arr.length > 150) h += `<div class="more">+${arr.length - 150} more — refine search</div>`;
+    if (arr.length > 150) h += `<div class="more">${t('more', arr.length - 150)}</div>`;
   }
-  $('#plist').innerHTML = h || '<div class="more" style="padding:16px 12px">nothing found. Type a shell command, file path or URL below.</div>';
-  $('#selc').textContent = `${S.selected.size} selected`;
+  $('#plist').innerHTML = h || `<div class="more" style="padding:16px 12px">${t('none')}</div>`;
+  $('#selc').textContent = t('selected', S.selected.size);
 }
 $('#plist').addEventListener('click', guard(async (e) => {
   const g = e.target.closest('.gh');
@@ -324,7 +356,7 @@ $('#plist').addEventListener('click', guard(async (e) => {
   }
   const r = e.target.closest('.row');
   if (!r) return;
-  if (r.dataset.load) { await api('open', { load: r.dataset.load }); toast(`loaded ${r.dataset.load}`); return; }
+  if (r.dataset.load) { await api('open', { load: r.dataset.load }); toast(t('loaded', r.dataset.load)); return; }
   const key = r.dataset.key;
   if (S.selected.has(key)) S.selected.delete(key);
   else S.selected.set(key, key.startsWith('raw:') ? S.selected.get(key) : { key });
@@ -339,30 +371,31 @@ $('#raw').addEventListener('keydown', (e) => {
 });
 const build = (append) => guard(async () => {
   const items = [...S.selected.values()];
-  if (!items.length) return toast('select some items first');
+  if (!items.length) return toast(t('pickFirst'));
   const r = await api('open', { items, mode: $('#mode').value, append });
   S.selected.clear(); renderPalette();
   const n = r.pipeline?.nodes.length || 0;
-  toast(r.unresolved?.length ? `${n} nodes · unresolved: ${r.unresolved.map((u) => u.item).join(', ')}` : `pipeline ready · ${n} nodes`, !!r.unresolved?.length);
+  toast(r.unresolved?.length ? `${n} ${t('nodes')} · ${t('unresolved')}: ${r.unresolved.map((u) => u.item).join(', ')}` : t('ready', n), !!r.unresolved?.length);
   if (matchMedia('(max-width:760px)').matches) document.body.classList.add('nopal');
 });
 $('#bBuild').onclick = build(false); $('#bAdd').onclick = build(true);
-$('#bRescan').onclick = guard(async () => { const r = await api('rescan', {}); S.items = r.items; S.pipelines = r.pipelines; renderPalette(); toast(`${S.items.length} items`); });
+$('#bGo').onclick = guard(async () => { await build(false)(); if (nodes().length && confirmRisky(nodes())) { S.startedAt = Date.now(); await api('run', { all: true }); openLog(); } });
+$('#bRescan').onclick = guard(async () => { const r = await api('rescan', {}); S.items = r.items; S.pipelines = r.pipelines; renderPalette(); toast(t('items', S.items.length)); });
 $('#bPal').onclick = () => { document.body.classList.toggle('nopal'); $('#bPal').setAttribute('aria-pressed', !document.body.classList.contains('nopal')); setTimeout(resize, 260); };
 
 /* ───────── header controls ───────── */
 $('#host').onchange = guard(async (e) => { await api('host', { host: e.target.value }); });
 $('#bApprove').onclick = guard(async () => {
   const on = !S.autoApprove;
-  if (on && !confirm('Auto-approve tool use for headless runs?\n\nAgents launched from this app will be able to edit files and run commands without asking.')) return;
+  if (on && !confirm(t('approveQ'))) return;
   await api('approve', { on });
 });
-$('#bRun').onclick = guard(async () => { if (!nodes().length) return toast('nothing to run yet'); if (!confirmRisky(nodes())) return; S.startedAt = Date.now(); await api('run', { all: true }); openLog(); });
+$('#bRun').onclick = guard(async () => { if (!nodes().length) return toast(t('nothing')); if (!confirmRisky(nodes())) return; S.startedAt = Date.now(); await api('run', { all: true }); openLog(); });
 $('#bStop').onclick = guard(() => api('stop', {}));
 
 function confirmRisky(list) {
   const r = list.filter((n) => n.type === 'script' && RISKY.test(n.command || ''));
-  return !r.length || confirm(`These commands look destructive:\n\n${r.map((n) => '  ' + n.command).join('\n')}\n\nRun anyway?`);
+  return !r.length || confirm(t('risky', r.map((n) => '  ' + n.command).join('\n')));
 }
 async function runNode(id, from) {
   const n = byId(id); if (!n) return;
@@ -417,20 +450,20 @@ function selectNode(id, show) { S.sel = id; markSel(); if (show) { $('#drawer').
 function markSel() { for (const el of document.querySelectorAll('.node')) el.classList.toggle('sel', el.dataset.id === S.sel); }
 async function renderDetail() {
   const box = $('#detail'); const n = byId(S.sel);
-  if (!n) { box.innerHTML = '<div style="color:var(--dim)">Select a node (the <b>i</b> button on a node) to edit what it runs.</div>'; return; }
+  if (!n) { box.innerHTML = `<div style="color:var(--dim)">${t('selNode')}</div>`; return; }
   const others = nodes().filter((m) => m.id !== n.id);
   const isScript = n.type === 'script', isRef = n.type === 'ref';
-  box.innerHTML = `<div class="dh"><span style="color:var(--acc)">${ic(TYPE_ICON[n.type])}</span><b>${esc(n.name)}</b><small>${n.type}${n.desc ? ' · ' + esc(n.desc.slice(0, 120)) : ''}</small></div>
-    ${isRef ? '<label>content</label><pre id="refpre">loading…</pre>' : `
-    <label>${isScript ? 'shell command' : 'prompt override (empty = automatic)'}</label>
+  box.innerHTML = `<div class="dh"><span style="color:var(--acc)">${ic(TYPE_ICON[n.type])}</span><b>${esc(n.name)}</b><small>${t('ty_' + n.type)}${n.desc ? ' · ' + esc(n.desc.slice(0, 120)) : ''}</small></div>
+    ${isRef ? `<label>${t('content')}</label><pre id="refpre">${t('loading')}</pre>` : `
+    <label>${isScript ? t('cmdLbl') : t('promptLbl')}</label>
     <textarea id="dcmd" spellcheck="false" placeholder="${esc(n.preview || '')}">${esc(isScript ? n.command || '' : n.prompt || '')}</textarea>
-    ${isScript ? '' : `<label>arguments</label><input type="text" id="dargs" value="${esc(n.args || '')}" placeholder="passed to the skill / command">`}`}
-    <label>runs after</label>
+    ${isScript ? '' : `<label>${t('argsLbl')}</label><input type="text" id="dargs" value="${esc(n.args || '')}" placeholder="${t('argsPh')}">`}`}
+    <label>${t('after')}</label>
     <div class="checks">${others.length ? others.map((m) => `<label><input type="checkbox" data-need="${esc(m.id)}" ${n.needs.includes(m.id) ? 'checked' : ''}>${esc(m.label)}</label>`).join('') : '<span style="color:var(--dim)">—</span>'}</div>
     <div class="acts">
-      ${isRef ? '' : `<button class="btn p" id="dRun">${ic('play')} run</button><button class="btn" id="dFrom">${ic('layers')} run from here</button>`}
-      <button class="btn" id="dSave">${ic('save')} save</button>
-      <button class="btn d" id="dDel">${ic('trash')} remove</button></div>`;
+      ${isRef ? '' : `<button class="btn p" id="dRun">${ic('play')} ${t('run')}</button><button class="btn" id="dFrom">${ic('layers')} ${t('runFrom')}</button>`}
+      <button class="btn" id="dSave">${ic('save')} ${t('save')}</button>
+      <button class="btn d" id="dDel">${ic('trash')} ${t('remove')}</button></div>`;
   if (isRef) {
     const pre = $('#refpre');
     if (n.path) api('ref?path=' + encodeURIComponent(n.path)).then((r) => { pre.textContent = r.text.slice(0, 4000); }).catch(() => { pre.textContent = n.path; });
@@ -443,7 +476,7 @@ async function renderDetail() {
     t.needs = [...box.querySelectorAll('[data-need]')].filter((i) => i.checked).map((i) => i.dataset.need);
     return c;
   };
-  const save = guard(async () => { await api('pipeline', { pipeline: collect() }); toast('saved'); });
+  const save = guard(async () => { await api('pipeline', { pipeline: collect() }); toast(t('saved')); });
   $('#dSave').onclick = save;
   if (!isRef) {
     $('#dRun').onclick = guard(async () => { await api('pipeline', { pipeline: collect() }); await runNode(n.id); });
@@ -514,7 +547,7 @@ function renderNodes() {
     let el = els.get(n.id);
     if (!el) {
       el = document.createElement('div'); el.className = 'node'; el.dataset.id = n.id; el.tabIndex = 0; el.setAttribute('role', 'button');
-      el.innerHTML = `<span class="w"></span><span class="t"><b></b><i></i></span><span class="st">${ic('dots', 'i-q')}${ic('load', 'i-run')}${ic('check', 'i-ok')}${ic('x', 'i-err')}${ic('minus', 'i-skip')}${ic('stop', 'i-stop')}</span><span class="bar"></span><button class="info" title="Edit / details" tabindex="-1">${ic('info')}</button>`;
+      el.innerHTML = `<span class="w"></span><span class="t"><b></b><i></i></span><span class="st">${ic('dots', 'i-q')}${ic('load', 'i-run')}${ic('check', 'i-ok')}${ic('x', 'i-err')}${ic('minus', 'i-skip')}${ic('stop', 'i-stop')}</span><span class="bar"></span><button class="info" title="${t('tipInfo')}" tabindex="-1">${ic('info')}</button>`;
       layer.appendChild(el); els.set(n.id, el);
       el.addEventListener('click', (e) => { if (e.target.closest('.info')) { e.stopPropagation(); selectNode(n.id, true); return; } guard(runNode)(n.id, e.shiftKey); });
       el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); guard(runNode)(n.id, e.shiftKey); } else if (e.key === 'i') selectNode(n.id, true); });
@@ -524,8 +557,8 @@ function renderNodes() {
     el.dataset.type = n.type;
     el.querySelector('.w').innerHTML = ic(TYPE_ICON[n.type]);
     el.querySelector('b').textContent = n.label;
-    el.querySelector('i').textContent = `${n.type}${n.type === 'skill' || n.type === 'command' || n.type === 'prompt' ? ' · ' + S.host : ''}`;
-    el.setAttribute('aria-label', `${n.type} ${n.label} — click to run`); el.title = n.label + (n.desc ? ' — ' + n.desc : '');
+    el.querySelector('i').textContent = `${t('ty_' + n.type)}${n.type === 'skill' || n.type === 'command' || n.type === 'prompt' ? ' · ' + S.host : ''}`;
+    el.setAttribute('aria-label', `${t('ty_' + n.type)} ${n.label} — ${t('clickRun')}`); el.title = n.label + (n.desc ? ' — ' + n.desc : '');
     el.className = `node ${status(n.id)}${S.sel === n.id ? ' sel' : ''}`;
     void cur;
   }
@@ -534,7 +567,7 @@ function renderNodes() {
 function paintStates() { for (const [id, el] of els) el.className = `node ${status(id)}${S.sel === id ? ' sel' : ''}`; renderHeader(); }
 function hint(id) {
   const n = id && byId(id);
-  $('#hint').innerHTML = n ? `<b>click</b> run · <b>shift-click</b> run from here · <b>i</b> edit &nbsp;│&nbsp; ${esc(n.preview || n.name)}` : '';
+  $('#hint').innerHTML = n ? `${t('hint')} &nbsp;│&nbsp; ${esc(n.preview || n.name)}` : '';
 }
 
 /* pointer: orbit / pan / zoom */
@@ -693,7 +726,7 @@ async function resync() {
 }
 function connect() {
   const es = new EventSource('/api/events?t=' + encodeURIComponent(TOKEN));
-  es.onopen = () => resync().catch(() => {});
+  es.onopen = () => resync().catch((e) => { console.error(e); toast(e.message, true); });
   es.addEventListener('pipeline', (e) => { applyPipeline(JSON.parse(e.data)); api('state').then((s) => { S.states = s.states || {}; S.pipelines = s.pipelines; paintStates(); renderPalette(); }).catch(() => {}); });
   es.addEventListener('settings', (e) => applySettings(JSON.parse(e.data)));
   es.addEventListener('state', (e) => { const s = JSON.parse(e.data); const wasBusy = isBusy(); S.states[s.node] = s; if (!wasBusy && isBusy() && !S.startedAt) S.startedAt = Date.now(); paintStates(); });
@@ -701,7 +734,7 @@ function connect() {
   es.addEventListener('run', (e) => {
     const r = JSON.parse(e.data);
     if (r.status === 'start') S.startedAt = Date.now();
-    else { S.startedAt = 0; toast(`${r.ok ? 'done' : 'finished with errors'} · ${Math.round(r.ms / 1000)}s`, !r.ok); renderHeader(); }
+    else { S.startedAt = 0; toast(t('finishedIn', r.ok ? t('done') : t('finished_err'), Math.round(r.ms / 1000)), !r.ok); renderHeader(); }
   });
 }
 
@@ -711,8 +744,20 @@ addEventListener('keydown', (e) => {
   else if (e.key === 'Escape') document.activeElement.blur?.();
 });
 
+function applyLang() {
+  document.documentElement.lang = LANG; $('#bLang').textContent = LANG.toUpperCase();
+  const map = [['#hostwrap select', 'hostTip'], ['#bApprove', 'approveTip'], ['#bPal', 'palTip'], ['#bRun', 'runTip'], ['#bStop', 'stopTip'], ['#bRescan', 'rescanTip'], ['#mode', 'modeTip'], ['#bAdd', 'addTip'], ['#bBuild', 'buildTip'], ['#bGo', 'goTip'], ['#fSel', 'onlySelTip'], ['#bClear', 'clearTip'], ['#bMin', 'minTip']];
+  for (const [s, k] of map) $(s).title = t(k);
+  $('#q').placeholder = t('search'); $('#raw').placeholder = t('raw');
+  const o = $('#mode').options; o[0].textContent = t('auto'); o[1].textContent = t('seq'); o[2].textContent = t('par');
+  $('#tLog').textContent = t('tLog'); $('#tNode').textContent = t('tNode'); $('#fSel').textContent = t('onlySel');
+  const ps = $('#empty').querySelectorAll('p'); ps[0].textContent = t('emptyA'); ps[1].textContent = t('emptyB');
+  renderHeader(); renderPalette(); renderNodes(); if (S.tab === 'node') renderDetail();
+}
+$('#bLang').onclick = () => { LANG = LANG === 'fr' ? 'en' : 'fr'; try { localStorage.setItem('flow-lang', LANG); } catch (e) { /* ignore */ } applyLang(); };
 setTab('log');
 $('#bPal').setAttribute('aria-pressed', false);
+applyLang();
 resize(); requestAnimationFrame(frame);
 connect();
 })();

@@ -1,6 +1,6 @@
 <p align="center"><img src="docs/preview.png" alt="VTLO-visutool: 3D pipeline running" width="100%"></p>
 
-# VTLO-visutool  (`/flow`)
+# VTLO-visutool  (`/flow`)  ·  [Français](README.fr.md)
 
 **Quick install (one line)**
 
@@ -34,6 +34,7 @@ In the app: **click** a node = run it (click again = stop) · **shift-click** = 
 Palette: tick items → wand = new pipeline, + = append. Free input accepts shell commands, `?agent prompt`, URLs, paths.
 
 ## CLI
+    flow            # opens the app · flow a b "npm run x" = pipeline from these · flow go a b = build + run · flow update
     flow url   # reprint/reopen the access URL if you lost it (403 page)
     flow list [--compact|--json|--desc]   flow open [--load N|--items a,b|--import wf.md] [--mode auto|seq|par]
     flow run  [NAME|--items …] [--approve] (headless)   flow status | stop | doctor | uninstall
