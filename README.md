@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/preview.png" alt="VTLO-visutool: 3D pipeline running" width="100%"></p>
+
 # VTLO-visutool  (`/flow`)
 
 Turns any workflow, pipeline or group of skills / commands / scripts / references into a clickable 3D web app.
