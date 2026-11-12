@@ -17,12 +17,15 @@ Dans le CLI, tape `/flow` : il liste ce qu'il a trouvé et te demande quels skil
 - `/flow release` → ouvre un pipeline existant (`.flow/pipelines/*.json` ou workflow agy `.md`, affiché tel quel)
 - `/flow plan-feature, lint-check, npm:test, deploy-site` → pipeline auto-orchestré (plan → build → vérif → livraison → rapport, en parallèle au sein d'une étape ; `after:` dans le SKILL.md ajoute une dépendance)
 - Dis « en séquence » ou « en parallèle » pour changer le câblage.
+- **Étape obligatoire** : quand tu choisis des éléments, rien n'est construit directement. Un **plan est proposé** (étapes, groupes parallèles, raison de chaque position) et **tu dois le valider** — dans l'appli (modale : décocher une étape, changer le mode, Valider / Valider et lancer / Annuler) ou dans le chat (`flow validate`). Un pipeline existant s'ouvre tel quel, sans plan.
 
 Depuis le terminal (plus court) :
 
     flow                       # ouvre l'appli, choisis dans la palette
     flow a b "npm run x"       # pipeline construit avec ces éléments
-    flow go a b c              # pareil + lancement immédiat
+    flow go a b c              # pareil + lancement immédiat (après ta validation)
+    flow plan a b c            # propose seulement le plan ; puis : flow validate [--run] [--exclude id] · flow cancel
+    # --yes : valide d'avance (automatisation, à demander explicitement)
     flow install               # ajoute /flow aux CLI détectés
     flow update                # dernière version + réinstallation
     flow url                   # réaffiche l'URL d'accès (si la page affiche 403)

@@ -34,10 +34,12 @@ In the app: **click** a node = run it (click again = stop) · **shift-click** = 
 Palette: tick items → wand = new pipeline, + = append. Free input accepts shell commands, `?agent prompt`, URLs, paths.
 
 ## CLI
-    flow            # opens the app · flow a b "npm run x" = pipeline from these · flow go a b = build + run · flow update
+    flow            # opens the app · flow a b "npm run x" = pipeline from these · flow go a b = plan, validate, then run · flow plan / validate / cancel · flow update
     flow url   # reprint/reopen the access URL if you lost it (403 page)
     flow list [--compact|--json|--desc]   flow open [--load N|--items a,b|--import wf.md] [--mode auto|seq|par]
     flow run  [NAME|--items …] [--approve] (headless)   flow status | stop | doctor | uninstall
+
+**Mandatory plan validation.** Selecting items never builds a pipeline directly: a plan is *proposed* (steps, parallel groups, why each step sits where it does) and you must validate it — in the app (modal: untick a step, change the mode, Validate / Validate & run / Cancel) or in chat/terminal (`flow validate`, `flow cancel`). Existing pipelines open as-is. `--yes` pre-validates for automation and must be passed explicitly.
 
 ## How nodes execute
 | node | runs |

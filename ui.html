@@ -60,6 +60,19 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #empty svg.ic{width:30px;height:30px;color:var(--acc);margin-bottom:10px;opacity:.8}
 #empty p{margin:2px 0}
 #empty[hidden]{display:none}
+#plan{position:absolute;inset:0;z-index:60;display:none;align-items:center;justify-content:center;background:rgba(5,8,12,.72);backdrop-filter:blur(4px);padding:12px}
+#plan.on{display:flex}
+#plan .box{width:min(560px,100%);max-height:100%;overflow:auto;border:1px solid var(--faint);border-radius:14px;background:rgba(10,14,19,.97);padding:16px;display:flex;flex-direction:column;gap:10px}
+#plan h2{margin:0;font-size:14px;letter-spacing:.04em}
+#plan .sub{font-size:11px;opacity:.7}
+#plan .lay{display:flex;flex-direction:column;gap:4px;border-left:2px solid var(--faint);padding-left:10px}
+#plan .lay.par{border-left-color:var(--accent,#5eead4)}
+#plan label.st{display:flex;gap:8px;align-items:baseline;font-size:12px;cursor:pointer}
+#plan label.st small{opacity:.6;font-size:10.5px}
+#plan .unres{font-size:11px;color:var(--err)}
+#plan .act{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+#plan .act button,#plan select{font:inherit;font-size:12px;padding:7px 12px;border-radius:9px;border:1px solid var(--faint);background:rgba(255,255,255,.04);color:inherit;cursor:pointer}
+#plan .act button.ok{border-color:var(--accent,#5eead4)}
 #toast{position:absolute;left:50%;top:12px;transform:translate(-50%,-8px);padding:7px 12px;border:1px solid var(--faint);border-radius:9px;background:rgba(10,14,19,.96);opacity:0;pointer-events:none;transition:.25s;z-index:50;max-width:80%}
 #toast.on{opacity:1;transform:translate(-50%,0)}
 #toast.err{border-color:var(--err);color:var(--err)}
@@ -160,9 +173,35 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
   .pname{display:none}#status{display:none}
   #drawer{height:200px}
 }
+#splash{position:fixed;inset:0;z-index:999;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 50%,#0b1118,#04060a);perspective:900px;overflow:hidden;transition:opacity .7s ease,filter .7s ease}
+#splash.out{opacity:0;filter:blur(12px);pointer-events:none}
+#splash .pz{position:relative;width:min(56vmin,360px);aspect-ratio:795/708;transform-style:preserve-3d;animation:pzspin 4.2s ease-in-out forwards}
+#splash .pc{position:absolute;background-image:url(/splash.png);background-repeat:no-repeat;opacity:0;transform-style:preserve-3d;animation:pzin 1.5s cubic-bezier(.2,.8,.2,1) forwards;will-change:transform,filter,opacity}
+#splash .glow{position:absolute;inset:-20%;background:url(/splash.png) center/contain no-repeat;filter:blur(38px) saturate(1.6);opacity:0;animation:pzglow 3.4s ease forwards}
+@keyframes pzin{0%{opacity:0;filter:blur(18px);transform:translate3d(var(--x),var(--y),var(--z)) rotateX(var(--rx)) rotateY(var(--ry)) rotateZ(var(--rz)) scale(.6)}
+ 55%{opacity:1;filter:blur(7px)}100%{opacity:1;filter:blur(0);transform:none}}
+@keyframes pzspin{0%{transform:rotateY(-24deg) rotateX(10deg)}60%{transform:rotateY(10deg) rotateX(-4deg)}100%{transform:rotateY(0) rotateX(0)}}
+@keyframes pzglow{0%{opacity:0}60%{opacity:.55}100%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){#splash .pc,#splash .pz,#splash .glow{animation-duration:.01s;animation-delay:0s!important}}
 </style>
 </head>
 <body class="nopal">
+<div id="splash" aria-hidden="true"><div class="pz" id="pz"><div class="glow"></div></div></div>
+<script>
+(() => { // launch splash: the badge assembles itself as a blurred 3D puzzle, then clears
+  const sp = document.getElementById('splash'), pz = document.getElementById('pz'); if (!sp) return;
+  const C = 6, R = 6, r = (a) => (Math.random() * 2 - 1) * a;
+  for (let j = 0; j < R; j++) for (let i = 0; i < C; i++) {
+    const d = document.createElement('div'); d.className = 'pc';
+    d.style.cssText = `left:${i * 100 / C}%;top:${j * 100 / R}%;width:${100 / C + .3}%;height:${100 / R + .3}%;background-size:${C * 100}% ${R * 100}%;background-position:${i * 100 / (C - 1)}% ${j * 100 / (R - 1)}%;` +
+      `--x:${r(520)}px;--y:${r(420)}px;--z:${r(700) - 200}px;--rx:${r(160)}deg;--ry:${r(160)}deg;--rz:${r(200)}deg;animation-delay:${Math.random() * .9}s`;
+    pz.append(d);
+  }
+  const end = () => { sp.classList.add('out'); setTimeout(() => sp.remove(), 800); };
+  const t0 = Date.now(); window.__splashDone = () => setTimeout(end, Math.max(0, 2700 - (Date.now() - t0)));
+  setTimeout(end, 6000); sp.onclick = end;
+})();
+</script>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
   <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 16l.7 1.8L21.5 18.5l-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></symbol>
   <symbol id="i-slash" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M14.5 7.5l-5 9"/></symbol>
@@ -224,6 +263,12 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
       <div id="nodes"></div>
       <div id="empty"><div><svg class="ic"><use href="#i-wand"/></svg><p>no pipeline yet</p><p style="font-size:11px">select skills, scripts or references in the palette, then build</p></div></div>
       <div id="hint"></div>
+      <div id="plan" role="dialog" aria-modal="true" aria-labelledby="planT"><div class="box">
+        <h2 id="planT"></h2><div class="sub" id="planSub"></div>
+        <div id="planBody"></div><div class="unres" id="planUn"></div>
+        <div class="act"><span class="sub" id="planModeL"></span><select id="planMode"><option value="auto"></option><option value="seq"></option><option value="par"></option></select>
+          <button id="planNo"></button><button id="planOk" class="ok"></button><button id="planRun" class="ok"></button></div>
+      </div></div>
       <div id="toast"></div>
     </div>
     <section id="drawer">
@@ -260,7 +305,7 @@ const L = {
     modeTip: 'How selected items are wired', auto: 'auto', seq: 'sequence', par: 'parallel', addTip: 'Append to current pipeline', buildTip: 'Build a new pipeline from selection', goTip: 'Build and run in one click',
     emptyA: 'no pipeline yet', emptyB: 'select skills, scripts or references in the palette, then build', tLog: 'log', tNode: 'node', onlySel: 'only selected', onlySelTip: 'Only show lines of the selected node',
     clearTip: 'Clear log', minTip: 'Collapse', hostTip: 'CLI used to run skills / commands / prompts', selected: '{0} selected', g_pipeline: 'pipelines', g_custom: 'custom', g_skill: 'skills', g_command: 'commands', g_script: 'scripts', g_ref: 'references',
-    workflow: 'workflow', nNodes: '{0} nodes', more: '+{0} more — refine search', none: 'nothing found. Type a shell command, file path or URL below.', pickFirst: 'select some items first', ready: 'pipeline ready · {0} nodes', unresolved: 'unresolved',
+    workflow: 'workflow', nNodes: '{0} nodes', more: '+{0} more — refine search', none: 'nothing found. Type a shell command, file path or URL below.', pickFirst: 'select some items first', planTitle: 'Proposed plan — validate to build', planSub: '{0} steps · nothing is built until you validate', planMode: 'mode', planOk: 'Validate', planRun: 'Validate & run', planCancel: 'Cancel', planPar: 'in parallel', planUn: 'unresolved', validated: 'plan validated · {0} nodes', cancelled: 'plan cancelled', why_order: 'given order', why_parallel: 'in parallel', why_context: 'context', why_after: 'after', why_stage: 'stage', st_plan: 'plan', st_build: 'build', st_verify: 'verify', st_ship: 'ship', st_report: 'report', existing: 'existing', ready: 'pipeline ready · {0} nodes', unresolved: 'unresolved',
     items: '{0} items', loaded: 'loaded {0}', nothing: 'nothing to run yet', saved: 'saved', finishedIn: '{0} · {1}s', approveQ: 'Auto-approve tool use for headless runs?\n\nAgents launched from this app will be able to edit files and run commands without asking.',
     risky: 'These commands look destructive:\n\n{0}\n\nRun anyway?', selNode: 'Select a node (the i button on a node) to edit what it runs.', content: 'content', loading: 'loading…', cmdLbl: 'shell command', promptLbl: 'prompt override (empty = automatic)',
     argsLbl: 'arguments', argsPh: 'passed to the skill / command', after: 'runs after', run: 'run', runFrom: 'run from here', save: 'save', remove: 'remove', clickRun: 'click to run', hint: '<b>click</b> run · <b>shift-click</b> run from here · <b>i</b> edit', tipInfo: 'Edit / details',
@@ -271,7 +316,7 @@ const L = {
     modeTip: 'Comment relier les éléments choisis', auto: 'auto', seq: 'séquence', par: 'parallèle', addTip: 'Ajouter au pipeline actuel', buildTip: 'Construire un nouveau pipeline avec la sélection', goTip: 'Construire et lancer en un clic',
     emptyA: 'aucun pipeline', emptyB: 'choisis des skills, scripts ou références dans la palette, puis construis', tLog: 'journal', tNode: 'nœud', onlySel: 'sélection seule', onlySelTip: 'Afficher seulement les lignes du nœud sélectionné',
     clearTip: 'Vider le journal', minTip: 'Réduire', hostTip: 'CLI utilisé pour lancer skills / commandes / prompts', selected: '{0} sél.', g_pipeline: 'pipelines', g_custom: 'personnalisé', g_skill: 'skills', g_command: 'commandes', g_script: 'scripts', g_ref: 'références',
-    workflow: 'workflow', nNodes: '{0} nœuds', more: '+{0} de plus — affine la recherche', none: 'rien trouvé. Saisis une commande shell, un chemin ou une URL ci-dessous.', pickFirst: "choisis d'abord des éléments", ready: 'pipeline prêt · {0} nœuds', unresolved: 'introuvable',
+    workflow: 'workflow', nNodes: '{0} nœuds', more: '+{0} de plus — affine la recherche', none: 'rien trouvé. Saisis une commande shell, un chemin ou une URL ci-dessous.', pickFirst: "choisis d'abord des éléments", planTitle: 'Plan proposé — valide pour construire', planSub: "{0} étapes · rien n'est construit avant ta validation", planMode: 'mode', planOk: 'Valider', planRun: 'Valider et lancer', planCancel: 'Annuler', planPar: 'en parallèle', planUn: 'introuvable', validated: 'plan validé · {0} nœuds', cancelled: 'plan annulé', why_order: 'ordre donné', why_parallel: 'en parallèle', why_context: 'contexte', why_after: 'après', why_stage: 'étape', st_plan: 'planification', st_build: 'construction', st_verify: 'vérification', st_ship: 'livraison', st_report: 'rapport', existing: 'existant', ready: 'pipeline prêt · {0} nœuds', unresolved: 'introuvable',
     items: '{0} éléments', loaded: '{0} chargé', nothing: 'rien à lancer pour le moment', saved: 'enregistré', finishedIn: '{0} · {1}s', approveQ: "Approuver automatiquement les outils en mode headless ?\n\nLes agents lancés depuis cette appli pourront modifier des fichiers et exécuter des commandes sans demander.",
     risky: 'Ces commandes semblent destructrices :\n\n{0}\n\nLancer quand même ?', selNode: "Sélectionne un nœud (bouton i sur un nœud) pour modifier ce qu'il exécute.", content: 'contenu', loading: 'chargement…', cmdLbl: 'commande shell', promptLbl: 'prompt personnalisé (vide = automatique)',
     argsLbl: 'arguments', argsPh: 'transmis au skill / à la commande', after: "s'exécute après", run: 'lancer', runFrom: "lancer à partir d'ici", save: 'enregistrer', remove: 'supprimer', clickRun: 'cliquer pour lancer', hint: '<b>clic</b> lancer · <b>maj+clic</b> lancer à partir de là · <b>i</b> modifier', tipInfo: 'Modifier / détails',
@@ -282,7 +327,7 @@ try { LANG = localStorage.getItem('flow-lang') || ''; } catch (e) { /* storage b
 if (LANG !== 'fr' && LANG !== 'en') LANG = /^fr/i.test(navigator.language || '') ? 'fr' : 'en';
 const t = (k, ...a) => (L[LANG][k] ?? L.en[k] ?? k).replace(/\{(\d)\}/g, (_, i) => a[+i] ?? '');
 const S = { pipeline: null, states: {}, items: [], pipelines: [], host: 'claude', hosts: {}, autoApprove: false,
-  sel: null, selected: new Map(), tab: 'log', filterSel: false, startedAt: 0 };
+  proposal: null, sel: null, selected: new Map(), tab: 'log', filterSel: false, startedAt: 0 };
 
 /* ───────── api ───────── */
 async function api(route, body) {
@@ -374,12 +419,54 @@ const build = (append) => guard(async () => {
   if (!items.length) return toast(t('pickFirst'));
   const r = await api('open', { items, mode: $('#mode').value, append });
   S.selected.clear(); renderPalette();
+  if (r.proposal) { S.proposal = r.proposal; renderPlan(); return; } // mandatory validation step: nothing is built yet
   const n = r.pipeline?.nodes.length || 0;
-  toast(r.unresolved?.length ? `${n} ${t('nodes')} · ${t('unresolved')}: ${r.unresolved.map((u) => u.item).join(', ')}` : t('ready', n), !!r.unresolved?.length);
+  toast(t('ready', n));
   if (matchMedia('(max-width:760px)').matches) document.body.classList.add('nopal');
 });
+function whyT(w) { if (!w) return ''; if (w.startsWith('after:')) return `${t('why_after')} ${w.slice(6)}`; if (w.startsWith('stage:')) return `${t('why_stage')} ${t('st_' + w.slice(6))}`; return t('why_' + w); }
+function renderPlan() {
+  const pr = S.proposal, el = $('#plan');
+  if (!pr) { el.classList.remove('on'); S.excl = new Set(); return; }
+  if (S.exclFor !== pr.id) { S.exclFor = pr.id; S.excl = new Set(); }
+  const by = new Map(pr.pipeline.nodes.map((n) => [n.id, n]));
+  const n = pr.pipeline.nodes.filter((x) => x.type !== 'ref').length;
+  $('#planT').textContent = t('planTitle'); $('#planSub').textContent = t('planSub', n) + ' · ' + pr.pipeline.name;
+  $('#planModeL').textContent = t('planMode');
+  const sel = $('#planMode'); [...sel.options].forEach((o) => { o.textContent = t(o.value); }); sel.value = pr.mode;
+  $('#planNo').textContent = t('planCancel'); $('#planOk').textContent = t('planOk'); $('#planRun').textContent = t('planRun');
+  const body = $('#planBody'); body.innerHTML = '';
+  body.style.cssText = 'display:flex;flex-direction:column;gap:8px';
+  pr.layers.forEach((ids) => {
+    const lay = document.createElement('div'); lay.className = 'lay' + (ids.length > 1 ? ' par' : '');
+    ids.forEach((id) => {
+      const nd = by.get(id), fresh = pr.fresh.includes(id);
+      const lb = document.createElement('label'); lb.className = 'st';
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !S.excl.has(id); cb.dataset.id = id; cb.disabled = !fresh; cb.onchange = () => { cb.checked ? S.excl.delete(id) : S.excl.add(id); };
+      const tx = document.createElement('span'); tx.textContent = `${ids.length > 1 ? '∥ ' : ''}${nd.label} (${nd.type})`;
+      const sm = document.createElement('small'); sm.textContent = (nd.why ? '— ' + whyT(nd.why) : '') + (fresh ? '' : ` [${t('existing')}]`);
+      lb.append(cb, tx, sm); lay.append(lb);
+    });
+    body.append(lay);
+  });
+  $('#planUn').textContent = (pr.unresolved || []).length ? `${t('planUn')}: ${pr.unresolved.map((u) => u.item).join(', ')}` : '';
+  el.classList.add('on'); $('#planOk').focus();
+}
+const planExclude = () => [...document.querySelectorAll('#planBody input:not(:checked)')].map((c) => c.dataset.id);
+async function planValidate(run) {
+  if (run && !confirmRisky(S.proposal.pipeline.nodes)) return;
+  const r = await api('validate', { exclude: planExclude(), run: !!run });
+  S.proposal = null; renderPlan();
+  toast(t('validated', r.pipeline?.nodes.length || 0));
+  if (run) { S.startedAt = Date.now(); openLog(); }
+  if (matchMedia('(max-width:760px)').matches) document.body.classList.add('nopal');
+}
+$('#planOk').onclick = guard(() => planValidate(false));
+$('#planRun').onclick = guard(() => planValidate(true));
+$('#planNo').onclick = guard(async () => { await api('cancel', {}); S.proposal = null; renderPlan(); toast(t('cancelled')); });
+$('#planMode').onchange = guard(async () => { const pr = S.proposal; const r = await api('open', { items: pr.sources, mode: $('#planMode').value, append: pr.append }); if (r.proposal) { S.proposal = r.proposal; renderPlan(); } });
 $('#bBuild').onclick = build(false); $('#bAdd').onclick = build(true);
-$('#bGo').onclick = guard(async () => { await build(false)(); if (nodes().length && confirmRisky(nodes())) { S.startedAt = Date.now(); await api('run', { all: true }); openLog(); } });
+$('#bGo').onclick = guard(async () => { await build(false)(); if (S.proposal) S.proposal.run = true; }); // plan modal appears; 'Validate & run' launches it
 $('#bRescan').onclick = guard(async () => { const r = await api('rescan', {}); S.items = r.items; S.pipelines = r.pipelines; renderPalette(); toast(t('items', S.items.length)); });
 $('#bPal').onclick = () => { document.body.classList.toggle('nopal'); $('#bPal').setAttribute('aria-pressed', !document.body.classList.contains('nopal')); setTimeout(resize, 260); };
 
@@ -572,6 +659,7 @@ function hint(id) {
 
 /* pointer: orbit / pan / zoom */
 let drag = null;
+for (const ev of ['pointerdown', 'pointerup', 'pointermove', 'wheel', 'contextmenu']) $('#plan').addEventListener(ev, (e) => e.stopPropagation()); // modal must not orbit/capture the 3D stage
 stage.addEventListener('pointerdown', (e) => {
   if (e.target.closest('.node')) return;
   drag = { x: e.clientX, y: e.clientY, pan: e.shiftKey || e.button === 1 || e.button === 2 }; stage.setPointerCapture(e.pointerId); stage.classList.add('drag');
@@ -719,15 +807,17 @@ function applyPipeline(p) { S.pipeline = p; layout(); renderNodes(); renderHeade
 async function resync() {
   const s = await api('state');
   S.items = s.items; S.pipelines = s.pipelines; S.states = s.states || {};
-  applySettings(s); applyPipeline(s.pipeline); renderPalette();
+  applySettings(s); applyPipeline(s.pipeline); renderPalette(); S.proposal = s.proposal || null; renderPlan();
   if (!s.pipeline) document.body.classList.remove('nopal');
   $('#bPal').setAttribute('aria-pressed', !document.body.classList.contains('nopal'));
   if (!$('#log').childElementCount) (s.logs || []).forEach(pushLog);
+  window.__splashDone?.();
 }
 function connect() {
   const es = new EventSource('/api/events?t=' + encodeURIComponent(TOKEN));
   es.onopen = () => resync().catch((e) => { console.error(e); toast(e.message, true); });
   es.addEventListener('pipeline', (e) => { applyPipeline(JSON.parse(e.data)); api('state').then((s) => { S.states = s.states || {}; S.pipelines = s.pipelines; paintStates(); renderPalette(); }).catch(() => {}); });
+  es.addEventListener('proposal', (e) => { S.proposal = JSON.parse(e.data); renderPlan(); });
   es.addEventListener('settings', (e) => applySettings(JSON.parse(e.data)));
   es.addEventListener('state', (e) => { const s = JSON.parse(e.data); const wasBusy = isBusy(); S.states[s.node] = s; if (!wasBusy && isBusy() && !S.startedAt) S.startedAt = Date.now(); paintStates(); });
   es.addEventListener('log', (e) => pushLog(JSON.parse(e.data)));

@@ -14,6 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { EventEmitter } from 'node:events';
+import readline from 'node:readline';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
@@ -24,6 +25,13 @@ const IS_WIN = process.platform === 'win32';
 let LANG = /^fr/i.test(process.env.FLOW_LANG || process.env.LC_ALL || process.env.LC_MESSAGES || process.env.LANG || '') ? 'fr' : 'en';
 const MSG = {
   en: {
+    plan_head: (n, m, c) => `PLAN PROPOSAL — '${n}' · mode ${m} · ${c} steps   (nothing is built until you validate)`,
+    plan_next: 'Validate: flow validate   ·   adjust: flow plan … --mode seq|par   ·   drop a step: flow validate --exclude <id>   ·   cancel: flow cancel',
+    why_order: 'given order', why_parallel: 'in parallel', why_context: 'context', why_after: 'after', why_stage: 'stage',
+    st_plan: 'plan', st_build: 'build', st_verify: 'verify', st_ship: 'ship', st_report: 'report',
+    confirm: 'Validate this plan and build the pipeline? [y/N] ', cancelled: 'plan cancelled', noplan: 'no pending plan — run: flow plan --items …',
+    needval: 'Plan not validated yet. Validate in the app, run `flow validate`, or re-run with --yes.', waiting: 'waiting for your validation (in the app, or: flow validate)',
+    validated: 'plan validated — pipeline built', tty: 'not a terminal: cannot ask for validation here',
     hint: 'click a node = run it · ▶ = run all · shift-click = run from there', nopipe: 'no pipeline yet — pick items in the app palette (left panel)',
     nodes: 'nodes', unresolved: 'unresolved', didyou: 'did you mean', nobrowser: '(could not open a browser automatically — open the URL above)',
     done: 'Done. Restart your CLI session, then type  /flow', engine: 'engine', removed: 'removed', running: 'running', nosrv: 'no flow server running — run: flow open',
@@ -32,12 +40,13 @@ const MSG = {
 
 Easy:
   flow                          open the app (pick items in the palette)
-  flow a b "npm run x"          open a pipeline built from these skills / scripts / files / commands
-  flow go a b c                 same, and run it right away
+  flow a b "npm run x"          PROPOSE a plan for these skills / scripts / files / commands; you validate it, then it is built
+  flow go a b c                 same, and run it right after you validate
   flow install                  add /flow to every CLI found (claude, gemini, agy)
   flow update                   pull the latest version and reinstall
 
 More:
+  flow plan   [--items a,b] [--mode auto|seq|par]   propose a plan (mandatory step)  ·  flow validate [--run] [--exclude id,id]  ·  flow cancel
   flow open   [--load NAME] [--items a,b] [--import wf.md] [--mode auto|seq|par] [--name N] [--host H] [--run] [--no-open]
   flow run    [NAME | --items a,b,c] [--approve]      headless, no UI
   flow list   [--compact|--json|--desc] [--type skill,command,script,ref,pipeline]
@@ -47,6 +56,13 @@ More:
 Config (optional): ~/.flow/config.json or <project>/.flow/config.json — see README.`,
   },
   fr: {
+    plan_head: (n, m, c) => `PLAN PROPOSÉ — '${n}' · mode ${m} · ${c} étapes   (rien n'est construit avant ta validation)`,
+    plan_next: 'Valider : flow validate   ·   ajuster : flow plan … --mode seq|par   ·   retirer une étape : flow validate --exclude <id>   ·   annuler : flow cancel',
+    why_order: 'ordre donné', why_parallel: 'en parallèle', why_context: 'contexte', why_after: 'après', why_stage: 'étape',
+    st_plan: 'planification', st_build: 'construction', st_verify: 'vérification', st_ship: 'livraison', st_report: 'rapport',
+    confirm: 'Valider ce plan et construire le pipeline ? [o/N] ', cancelled: 'plan annulé', noplan: 'aucun plan en attente — lance : flow plan --items …',
+    needval: "Plan pas encore validé. Valide dans l'appli, lance `flow validate`, ou relance avec --yes.", waiting: "en attente de ta validation (dans l'appli, ou : flow validate)",
+    validated: 'plan validé — pipeline construit', tty: "pas de terminal : impossible de demander la validation ici",
     hint: 'clic sur un nœud = l\'exécuter · ▶ = tout lancer · maj+clic = lancer à partir de là', nopipe: 'aucun pipeline — choisis des éléments dans la palette (panneau de gauche)',
     nodes: 'nœuds', unresolved: 'introuvable', didyou: 'tu voulais dire', nobrowser: '(impossible d\'ouvrir un navigateur automatiquement — ouvre l\'URL ci-dessus)',
     done: 'Terminé. Redémarre ta session CLI, puis tape  /flow', engine: 'moteur', removed: 'supprimé', running: 'exécution', nosrv: 'aucun serveur flow actif — lance : flow open',
@@ -55,12 +71,13 @@ Config (optional): ~/.flow/config.json or <project>/.flow/config.json — see RE
 
 Facile :
   flow                          ouvre l'appli (choisis les éléments dans la palette)
-  flow a b "npm run x"          ouvre un pipeline construit avec ces skills / scripts / fichiers / commandes
-  flow go a b c                 pareil, et le lance tout de suite
+  flow a b "npm run x"          PROPOSE un plan pour ces skills / scripts / fichiers / commandes ; tu le valides, puis il est construit
+  flow go a b c                 pareil, et le lance juste après ta validation
   flow install                  ajoute /flow à chaque CLI détecté (claude, gemini, agy)
   flow update                   récupère la dernière version et réinstalle
 
 Plus :
+  flow plan   [--items a,b] [--mode auto|seq|par]   propose un plan (étape obligatoire)  ·  flow validate [--run] [--exclude id,id]  ·  flow cancel
   flow open   [--load NOM] [--items a,b] [--import wf.md] [--mode auto|seq|par] [--name N] [--host H] [--run] [--no-open]
   flow run    [NOM | --items a,b,c] [--approve]      sans interface (headless)
   flow list   [--compact|--json|--desc] [--type skill,command,script,ref,pipeline]
@@ -347,24 +364,27 @@ function wire(nodes, mode = 'auto') {
   for (const n of work) {
     for (const d of n.deps || []) {
       const t = work.find((w) => w !== n && (w.name === d || w.id === slug(d)));
-      if (t && !n.needs.includes(t.id)) { n.needs.push(t.id); explicit.add(n.id); }
+      if (t && !n.needs.includes(t.id)) { n.needs.push(t.id); explicit.add(n.id); n.why = `after:${t.name}`; }
     }
   }
   if (!isDag(nodes)) { work.forEach((n) => { n.needs = []; }); explicit.clear(); }
 
+  if (mode === 'par') work.forEach((n) => { if (!n.why) n.why = 'parallel'; });
   if (mode === 'seq') {
-    work.forEach((n, i) => { if (i && !explicit.has(n.id)) n.needs.push(work[i - 1].id); });
+    work.forEach((n, i) => { if (!explicit.has(n.id)) n.why = 'order'; if (i && !explicit.has(n.id)) n.needs.push(work[i - 1].id); });
   } else if (mode === 'auto') {
     const st = work.map(stageOf);
     if (st.every((s) => s === null)) {
-      work.forEach((n, i) => { if (i && !explicit.has(n.id)) n.needs.push(work[i - 1].id); });
+      work.forEach((n, i) => { if (!explicit.has(n.id)) n.why = 'order'; if (i && !explicit.has(n.id)) n.needs.push(work[i - 1].id); });
     } else {
       // unknown stages inherit from the previous known item (else next known, else 0)
       const eff = st.slice();
       for (let i = 0; i < eff.length; i++) if (eff[i] === null) { let j = i - 1; while (j >= 0 && st[j] === null) j--; eff[i] = j >= 0 ? st[j] : (st.find((s) => s !== null) ?? 0); }
       const stages = [...new Set(eff)].sort((a, b) => a - b);
+      const SN = ['plan', 'build', 'verify', 'ship', 'report'];
       work.forEach((n, i) => {
         if (explicit.has(n.id)) return;
+        n.why = `stage:${SN[eff[i]]}`;
         const k = stages.indexOf(eff[i]);
         if (k === 0) return;
         const prev = stages[k - 1];
@@ -373,10 +393,20 @@ function wire(nodes, mode = 'auto') {
     }
   }
   // references feed the roots
+  refs.forEach((r) => { r.why = 'context'; });
   for (const n of work) if (!n.needs.length) n.needs.push(...refs.map((r) => r.id));
   if (!work.length) refs.forEach((r, i) => { if (i) r.needs = [refs[i - 1].id]; });
   nodes.forEach((n) => { delete n.deps; });
   return nodes;
+}
+
+function layersOf(nodes) {
+  const by = new Map(nodes.map((n) => [n.id, n])), d = new Map();
+  const depth = (id) => { if (d.has(id)) return d.get(id); d.set(id, 0); let v = 0; for (const q of by.get(id).needs) if (by.has(q)) v = Math.max(v, depth(q) + 1); d.set(id, v); return v; };
+  nodes.forEach((n) => depth(n.id));
+  const out = Array.from({ length: Math.max(-1, ...d.values()) + 1 }, () => []);
+  nodes.forEach((n) => out[d.get(n.id)].push(n.id));
+  return out;
 }
 
 function normalizePipeline(p, fallbackName = 'pipeline') {
@@ -386,7 +416,7 @@ function normalizePipeline(p, fallbackName = 'pipeline') {
     while (used.has(id)) id = `${slug(n.id || n.name)}-${k++}`;
     used.add(id);
     const o = { id, type: n.type, name: String(n.name || id).slice(0, 120), label: String(n.label || n.name || id).slice(0, 60), desc: String(n.desc || '').slice(0, 300), needs: [] };
-    for (const k2 of ['command', 'prompt', 'path', 'url', 'args', 'invoke']) if (typeof n[k2] === 'string' && n[k2]) o[k2] = n[k2];
+    for (const k2 of ['command', 'prompt', 'path', 'url', 'args', 'invoke', 'why']) if (typeof n[k2] === 'string' && n[k2]) o[k2] = n[k2];
     o._needs = Array.isArray(n.needs) ? n.needs.map(String) : [];
     if (Array.isArray(n.deps)) o.deps = n.deps;
     return o;
@@ -625,6 +655,7 @@ class App extends EventEmitter {
     this.pinned = !!host; // an explicitly requested host wins over the one stored in a pipeline
     this.autoApprove = false;
     this.pipeline = null;
+    this.proposal = null; // pending plan awaiting validation
     this.outFiles = {};
     this.logs = [];
     this._scan = null;
@@ -662,7 +693,7 @@ class App extends EventEmitter {
     return {
       v: VERSION, cwd: this.cwd, ...this.settings(), pipeline: this.pub(), states: this.runner.states,
       items: items.map((i) => ({ key: i.key, type: i.type, name: i.name, desc: clip(i.desc, 140), hosts: i.hosts })),
-      pipelines, logs: this.logs.slice(-500), running: this.runner.busy(),
+      pipelines, logs: this.logs.slice(-500), running: this.runner.busy(), proposal: this.pubProposal(),
     };
   }
 
@@ -690,7 +721,8 @@ class App extends EventEmitter {
     return this.pub();
   }
 
-  load(name, silent) {
+  load(name, silent) { return this.set(this.readPipeline(name), { persist: !silent }); }
+  readPipeline(name) {
     const { items, pipelines } = this.scan(true);
     const meta = pipelines.find((p) => p.name === name || p.key === name);
     let p = null;
@@ -701,7 +733,7 @@ class App extends EventEmitter {
     } else if (meta?.path) p = readJson(meta.path);
     else p = readJson(path.join(this.cwd, '.flow', 'pipelines', `${slug(name)}.json`));
     if (!p) throw new Error(`pipeline '${name}' not found`);
-    return this.set(normalizePipeline(p, name), { persist: !silent });
+    return normalizePipeline(p, name);
   }
 
   /** Resolve a selector (token string or descriptor object) into a node. */
@@ -745,22 +777,29 @@ class App extends EventEmitter {
       return { pipeline: this.set(normalizePipeline(parseWorkflowMd(readText(f), path.basename(f).replace(/\.md$/, ''), items))), unresolved };
     }
     if (spec.load) return { pipeline: this.load(spec.load), unresolved };
-    const sels = (spec.items || []).map((x) => x);
-    if (!sels.length) {
-      if (!this.pipeline) { /* nothing yet: UI will show the palette */ }
-      return { pipeline: this.pub(), unresolved };
-    }
-    const nodes = [];
+    const sels = spec.items || [];
+    if (!sels.length) return { pipeline: this.pub(), unresolved };
+    if (sels.length === 1) { const r = this.resolveOne(sels[0], items, pipelines); if (r.pipeline) return { pipeline: this.load(r.pipeline), unresolved }; }
+    // Selecting items never builds directly: a plan is PROPOSED and must be validated first.
+    return { proposal: this.plan(spec), pipeline: this.pub(), unresolved };
+  }
+
+  plan(spec = {}) {
+    const { items, pipelines } = this.scan(true);
+    if (spec.host) { if (!this.cfg.hosts[spec.host]) throw new Error(`unknown host ${spec.host}`); this.host = spec.host; this.pinned = true; }
+    const sels = spec.items || [];
+    if (!sels.length) throw new Error('no items to plan');
+    const unresolved = [], nodes = [];
     for (const s of sels) {
       const r = this.resolveOne(s, items, pipelines);
-      if (r.pipeline && sels.length === 1) return { pipeline: this.load(r.pipeline), unresolved };
-      if (r.pipeline) { const sub = this.load(r.pipeline); nodes.push(...sub.nodes.map((n) => ({ ...n, preview: undefined }))); continue; }
+      if (r.pipeline) { nodes.push(...this.readPipeline(r.pipeline).nodes.map((n) => ({ ...n }))); continue; }
       if (r.error) unresolved.push({ item: r.error, suggestions: r.suggestions || [] }); else nodes.push(r.node);
     }
     if (!nodes.length) throw new Error(`nothing matched: ${unresolved.map((u) => u.item).join(', ')}`);
     const used = new Set(spec.append && this.pipeline ? this.pipeline.nodes.map((n) => n.id) : []);
     for (const n of nodes) { let id = n.id || slug(n.name), k = 2; const base = id; while (used.has(id)) id = `${base}-${k++}`; used.add(id); n.id = id; }
     wire(nodes, spec.mode || 'auto');
+    const fresh = nodes.map((n) => n.id);
     let p;
     if (spec.append && this.pipeline) {
       const sinks = this.pipeline.nodes.filter((n) => !this.pipeline.nodes.some((m) => m.needs.includes(n.id))).map((n) => n.id);
@@ -770,8 +809,31 @@ class App extends EventEmitter {
       const base = spec.name || nodes.filter((n) => n.type !== 'ref').slice(0, 2).map((n) => n.label || n.name).join('-') + (nodes.length > 2 ? `-plus${nodes.length - 2}` : '');
       p = { name: base, host: this.host, source: `auto:${spec.mode || 'auto'}`, nodes };
     }
-    return { pipeline: this.set(normalizePipeline(p, 'pipeline')), unresolved };
+    this.proposal = { id: crypto.randomBytes(4).toString('hex'), mode: spec.mode || 'auto', append: !!spec.append, run: !!spec.run, sources: sels, name: spec.name || null, pipeline: normalizePipeline(p, 'pipeline'), fresh, unresolved, at: Date.now() };
+    const pub = this.pubProposal();
+    this.emit('proposal', pub);
+    return pub;
   }
+  pubProposal() {
+    const pr = this.proposal;
+    return pr ? { id: pr.id, mode: pr.mode, append: pr.append, run: pr.run, sources: pr.sources, name: pr.name, fresh: pr.fresh, unresolved: pr.unresolved, pipeline: { name: pr.pipeline.name, nodes: pr.pipeline.nodes }, layers: layersOf(pr.pipeline.nodes) } : null;
+  }
+  /** The mandatory gate: only here does a proposal become a real pipeline. `exclude` drops steps the user rejected. */
+  validate({ exclude = [] } = {}) {
+    const pr = this.proposal;
+    if (!pr) throw new Error('no pending plan to validate');
+    const p = JSON.parse(JSON.stringify(pr.pipeline));
+    for (const id of exclude.filter((x) => pr.fresh.includes(x))) {
+      const gone = p.nodes.find((n) => n.id === id); if (!gone) continue;
+      for (const m of p.nodes) if (m.needs.includes(id)) m.needs = [...new Set([...m.needs.filter((d) => d !== id), ...gone.needs])];
+      p.nodes = p.nodes.filter((n) => n.id !== id);
+    }
+    if (!p.nodes.length) throw new Error('the plan has no step left');
+    this.proposal = null;
+    this.emit('proposal', null);
+    return this.set(normalizePipeline(p, 'pipeline'));
+  }
+  cancel() { this.proposal = null; this.emit('proposal', null); }
 }
 
 function nodeFromItem(it) {
@@ -803,6 +865,7 @@ function serve(app, { port = 0 } = {}) {
   app.on('log', (l) => bcast('log', l));
   app.on('run', (r) => bcast('run', r));
   app.on('settings', (s) => bcast('settings', s));
+  app.on('proposal', (p) => bcast('proposal', p));
 
   const readBody = (req) => new Promise((resolve, reject) => {
     let n = 0; const chunks = [];
@@ -825,6 +888,7 @@ function serve(app, { port = 0 } = {}) {
         res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'set-cookie': `${cookieName()}=${token}; Path=/; HttpOnly; SameSite=Lax` });
         return res.end(html);
       }
+      if (url.pathname === '/splash.png') { res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'max-age=3600' }); return res.end(fs.readFileSync(path.join(HERE, 'splash.png'))); }
       if (url.pathname === '/bg.jpg') { res.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'max-age=3600' }); return res.end(fs.readFileSync(path.join(HERE, 'bg.jpg'))); }
       if (!url.pathname.startsWith('/api/')) return send(res, 404, 'not found', 'text/plain');
       if (!okToken(req, url)) return send(res, 401, { error: 'unauthorized' });
@@ -857,6 +921,9 @@ function serve(app, { port = 0 } = {}) {
 
       switch (route) {
         case 'open': return send(res, 200, app.open(body));
+        case 'plan': return send(res, 200, { proposal: app.plan(body) });
+        case 'validate': { const pub = app.validate(body); if (body.run) app.runner.runAll().catch(() => {}); return send(res, 200, { pipeline: pub }); }
+        case 'cancel': app.cancel(); return send(res, 200, { cancelled: true });
         case 'pipeline': return send(res, 200, { pipeline: app.replace(body.pipeline) });
         case 'host': app.setHost(body.host); return send(res, 200, app.settings());
         case 'approve': app.setAutoApprove(body.on); return send(res, 200, app.settings());
@@ -957,12 +1024,70 @@ function printList(snap, args) {
   console.log(lines.join('\n'));
 }
 
+function whyText(w) {
+  if (!w) return '';
+  if (w.startsWith('after:')) return `${tr('why_after')} ${w.slice(6)}`;
+  if (w.startsWith('stage:')) return `${tr('why_stage')} ${tr('st_' + w.slice(6))}`;
+  return tr('why_' + w) || w;
+}
+function renderPlan(pr) {
+  const by = new Map(pr.pipeline.nodes.map((n) => [n.id, n]));
+  const lines = [tr('plan_head', pr.pipeline.name, pr.mode, pr.pipeline.nodes.filter((n) => n.type !== 'ref').length)];
+  pr.layers.forEach((ids, i) => ids.forEach((id, j) => {
+    const n = by.get(id);
+    lines.push(` ${j === 0 ? String(i + 1).padStart(2) : '  '}. ${ids.length > 1 ? '∥' : ' '} ${n.label} (${n.type})${n.why ? `  — ${whyText(n.why)}` : ''}${pr.fresh.includes(id) ? '' : '  [existing]'}`);
+  }));
+  for (const u of pr.unresolved || []) lines.push(` ?  ${tr('unresolved')}: ${u.item}${u.suggestions?.length ? `  (${tr('didyou')}: ${u.suggestions.join(', ')})` : ''}`);
+  lines.push(tr('plan_next'));
+  return lines.join('\n');
+}
+function askYes(q) {
+  if (!process.stdin.isTTY) return Promise.resolve(false);
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => rl.question(q, (a) => { rl.close(); resolve(/^(y|yes|o|oui)$/i.test(a.trim())); }));
+}
+function itemsFromArgs(args) { return [...splitItems(args.items), ...args._.slice(1).flatMap((x) => (/\s/.test(x) ? [x] : splitItems(x)))]; }
+
+async function cmdPlan(args, { openUi = false } = {}) {
+  const cwd = path.resolve(args.cwd || process.cwd());
+  const items = itemsFromArgs(args);
+  if (!items.length) throw new Error('flow plan: give the items to plan (--items a,b,c)');
+  const lock = await ensureServer(cwd, args);
+  const r = await callServer(lock, 'POST', 'plan', { items, mode: args.mode || 'auto', name: args.name, host: args.host, append: !!args.append, run: !!args.run });
+  console.log(renderPlan(r.proposal));
+  if (openUi) { const url = `http://127.0.0.1:${lock.port}/?t=${lock.token}`; console.log(`\nflow ▸ ${url}\n${tr('waiting')}`); if (!args['no-open']) openBrowser(url); }
+  return { lock, proposal: r.proposal };
+}
+async function cmdValidate(args) {
+  const cwd = path.resolve(args.cwd || process.cwd());
+  const lock = await liveLock(cwd);
+  if (!lock) throw new Error(tr('nosrv'));
+  const r = await callServer(lock, 'POST', 'validate', { exclude: splitItems(args.exclude), run: !!args.run }).catch((e) => { throw new Error(/no pending/.test(e.message) ? tr('noplan') : e.message); });
+  const url = `http://127.0.0.1:${lock.port}/?t=${lock.token}`;
+  console.log(`${tr('validated')}: '${r.pipeline.name}'  ${r.pipeline.nodes.length} ${tr('nodes')}  ${pipelineShape(r.pipeline)}\nflow ▸ ${url}`);
+  if (!args['no-open']) openBrowser(url);
+  console.log(tr('hint'));
+}
+async function cmdCancel(args) {
+  const lock = await liveLock(path.resolve(args.cwd || process.cwd()));
+  if (!lock) throw new Error(tr('nosrv'));
+  await callServer(lock, 'POST', 'cancel', {}); console.log(tr('cancelled'));
+}
+/** flow go: plan → ask in the terminal → validate + run. Never skips validation unless --yes is given explicitly. */
+async function cmdGo(args) {
+  const { lock } = await cmdPlan({ ...args, run: true }, { openUi: false });
+  const ok = args.yes ? true : await askYes('\n' + tr('confirm'));
+  if (!ok) { console.log(process.stdin.isTTY ? tr('cancelled') : tr('needval')); if (process.stdin.isTTY) await callServer(lock, 'POST', 'cancel', {}); return; }
+  await cmdValidate({ ...args, run: true });
+}
+
 async function cmdOpen(args) {
   const cwd = path.resolve(args.cwd || process.cwd());
   const spec = { host: args.host, mode: args.mode || 'auto', name: args.name, append: !!args.append };
   if (args.load) spec.load = args.load;
   else if (args.import) spec.import = args.import;
-  else spec.items = [...splitItems(args.items), ...args._.slice(1).flatMap((x) => (/\s/.test(x) ? [x] : splitItems(x)))];
+  else spec.items = itemsFromArgs(args);
+  if (spec.items?.length && !spec.load) { await cmdPlan(args, { openUi: true }); return; } // items → plan first, validated in the app
   const lock = await ensureServer(cwd, args);
   const r = await callServer(lock, 'POST', 'open', spec);
   if (args.run && r.pipeline) await callServer(lock, 'POST', 'run', { all: true });
@@ -993,11 +1118,17 @@ async function cmdRun(args) {
   const cwd = path.resolve(args.cwd || process.cwd());
   const app = new App(cwd, { host: args.host });
   const spec = { mode: args.mode || 'auto', name: args.name, host: args.host };
-  if (args.load || args._[1] && !args.items) spec.load = args.load || args._[1];
+  if (args.load) spec.load = args.load;
   else if (args.import) spec.import = args.import;
-  else spec.items = [...splitItems(args.items)];
+  else spec.items = itemsFromArgs(args);
   if (args.approve) app.autoApprove = true;
-  const r = app.open(spec);
+  let r = app.open(spec);
+  if (r.proposal) { // items were selected: the plan must be validated before anything is built or run
+    console.log(renderPlan(r.proposal));
+    const ok = args.yes ? true : await askYes('\n' + tr('confirm'));
+    if (!ok) { console.log(process.stdin.isTTY ? tr('cancelled') : tr('needval')); process.exit(process.stdin.isTTY ? 0 : 2); }
+    r = { pipeline: app.validate({}) };
+  }
   if (!r.pipeline) throw new Error('nothing to run');
   console.log(`flow ▸ running '${r.pipeline.name}' via ${app.host}  ${pipelineShape(r.pipeline)}`);
   app.on('log', (l) => process.stdout.write(l.s === "sys" ? `\x1b[36m[${l.n}] ${l.t}\x1b[0m\n` : l.s === "err" ? `\x1b[31m[${l.n}] ${l.t}\x1b[0m\n` : `[${l.n}] ${l.t}\n`));
@@ -1045,12 +1176,14 @@ function agentBody(host, F) {
     `CLI: \`${F}\``,
     '',
     '1. Read the user request (below).',
-    `2. It names an existing pipeline (see PIPELINES in the list) → run \`${cmd} --load "<name>"\` (shown exactly as saved or as the workflow file defines it).`,
-    `3. It names items (skills, commands, scripts, references, file paths, URLs or raw shell commands) → run \`${cmd} --items "a,b,c" --mode auto\`.`,
+    `2. It names an existing, already-orchestrated pipeline (see PIPELINES in the list) → run \`${cmd} --load "<name>"\` (shown exactly as saved or as the workflow file defines it). No plan needed.`,
+    `3. It names items (skills, commands, scripts, references, file paths, URLs or raw shell commands) → FIRST propose a plan: run \`${F} plan --host ${host} --items "a,b,c" --mode auto\`. This builds NOTHING; it prints the proposed plan (steps, parallel groups, why each is placed there).`,
     '   - Use `--mode seq` when the user gave an order or says "then"; `--mode par` for "in parallel"; otherwise `auto` (infers plan → build → verify → ship → report, parallel inside a stage).',
-    '4. The request is empty or vague → show the list above grouped by type (names only, compact) and ask which skills / scripts / references or which existing pipeline to use. Accept names, numbers, or "all <type>". If the user prefers to pick in the app, run `' + cmd + '`.',
-    '5. When the command prints the URL, reply in at most 3 lines: the URL, the pipeline shape it printed, and "click a node to run it · ▶ runs everything · shift-click runs from a node".',
-    `6. If asked later what happened, run \`${F} status\`.`,
+    '4. MANDATORY VALIDATION: show the plan to the user in chat (compact: numbered steps, ∥ for parallel, one-line reason) and ask them to validate it (use the ask-the-user tool if you have one: Validate / Change order or mode / Remove a step / Cancel). Do NOT build, open or run anything before an explicit yes. If they want changes, re-run step 3 with adjusted items or mode (or pass `--exclude <step-id>` at validation), and show the new plan.',
+    `5. Only after the explicit yes: run \`${F} validate --host ${host}\` (add \`--run\` only if they asked to run it right away). It builds the pipeline and opens the app. If they decline: \`${F} cancel\`.`,
+    '6. The request is empty or vague → show the list above grouped by type (names only, compact) and ask which skills / scripts / references or which existing pipeline to use, then continue at step 3. If they prefer to pick in the app, run `' + cmd + '` (the app also requires validating the plan).',
+    '7. After validation, reply in at most 3 lines: the URL, the pipeline shape it printed, and "click a node to run it · ▶ runs everything · shift-click runs from a node".',
+    `8. If asked later what happened, run \`${F} status\`.`,
     '',
     'Answer in the user\'s language (French if they write French). Never invent item names: use the list. Quote the --items value. Do not wait for the server (the command returns immediately).',
   ].join('\n');
@@ -1093,7 +1226,7 @@ function cmdInstall(args, uninstall = false) {
   if (!uninstall) {
     fs.mkdirSync(engineDir, { recursive: true });
     fs.copyFileSync(fileURLToPath(import.meta.url), path.join(engineDir, 'flow.mjs'));
-    for (const a of ['ui.html', 'bg.jpg']) fs.copyFileSync(path.join(HERE, a), path.join(engineDir, a));
+    for (const a of ['ui.html', 'bg.jpg', 'splash.png']) fs.copyFileSync(path.join(HERE, a), path.join(engineDir, a));
     console.log(`${tr('engine')} → ${engineDir}`);
   }
   for (const t of installTargets(scope, cwd, hosts)) {
@@ -1113,7 +1246,7 @@ function cmdUpdate(args) {
   spawnSync(process.execPath, [path.join(HERE, 'flow.mjs'), 'install', ...(args.host ? ['--host', args.host] : []), ...(args.lang ? ['--lang', args.lang] : [])], { stdio: 'inherit' });
 }
 
-const KNOWN = new Set(['list', 'open', 'go', 'run', 'status', 'doctor', 'install', 'uninstall', 'update', 'stop', 'serve', 'url', 'help']);
+const KNOWN = new Set(['list', 'open', 'go', 'plan', 'validate', 'cancel', 'run', 'status', 'doctor', 'install', 'uninstall', 'update', 'stop', 'serve', 'url', 'help']);
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.lang === 'fr' || args.lang === 'en') LANG = args.lang;
@@ -1125,7 +1258,10 @@ async function main() {
   switch (cmd) {
     case 'list': { const app = new App(cwd, { host: args.host }); printList(app.snapshot(), args); break; }
     case 'open': await cmdOpen(args); break;
-    case 'go': args.run = true; args._[0] = 'open'; await cmdOpen(args); break;
+    case 'go': await cmdGo(args); break;
+    case 'plan': await cmdPlan(args); break;
+    case 'validate': await cmdValidate(args); break;
+    case 'cancel': await cmdCancel(args); break;
     case 'run': await cmdRun(args); break;
     case 'status': await cmdStatus(args); break;
     case 'doctor': cmdDoctor(args); break;
