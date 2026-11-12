@@ -211,10 +211,10 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #empty .eb .tbtn{pointer-events:auto;margin:0 3px}
 #guide{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;background:rgba(5,8,12,.78);backdrop-filter:blur(5px);padding:14px}
 #guide.on{display:flex}
-#guide .box{width:min(640px,100%);max-height:100%;overflow:auto;border:1px solid var(--faint);border-radius:16px;background:rgba(10,14,19,.98);padding:20px;display:flex;flex-direction:column;gap:14px}
+#guide .box{width:min(820px,100%);max-height:100%;overflow:auto;border:1px solid var(--faint);border-radius:16px;background:rgba(10,14,19,.98);padding:20px;display:flex;flex-direction:column;gap:14px}
 #guide h2{margin:0;font-size:17px}#guide .lead{margin:0;color:var(--dim);font-size:12.5px;line-height:1.5}
-#guide .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-@media(max-width:620px){#guide .steps{grid-template-columns:1fr}}
+#guide .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:760px){#guide .steps{grid-template-columns:1fr}}
 #guide .st{border:1px solid var(--line);border-radius:12px;padding:12px;background:rgba(255,255,255,.025)}
 #guide .st b{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:6px}
 #guide .st b i{font-style:normal;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--acc);color:#04070a;font-size:12px}
@@ -224,15 +224,43 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #guide .act{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 #guide .act label{font-size:11.5px;color:var(--dim);display:flex;gap:6px;align-items:center;cursor:pointer}
 @media(max-width:760px){.hl,.tbtn .tx.hm{display:none}}
+
+#brief{margin:10px;padding:11px;border:1px solid color-mix(in srgb,var(--warn) 60%,transparent);border-radius:12px;background:rgba(255,200,87,.06);display:flex;flex-direction:column;gap:6px}
+#brief .bh{display:flex;align-items:center;gap:8px;font-size:12.5px}
+#brief .bn{width:20px;height:20px;border-radius:50%;background:var(--warn);color:#04070a;display:grid;place-items:center;font-weight:700;font-size:12px;flex:none}
+#brief .bh em{font-style:normal;margin-left:auto;font-size:9.5px;letter-spacing:.08em;color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 60%,transparent);border-radius:10px;padding:2px 7px;white-space:nowrap}
+#brief label{font-size:11px;color:var(--ink);line-height:1.35}
+#brief textarea,#rb textarea{width:100%;min-height:62px;resize:vertical;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:7px 9px;color:var(--ink);font:inherit;font-size:12px;outline:0}
+#brief textarea:focus,#rb textarea:focus{border-color:var(--acc)}
+#brief .sum{font-size:11px;line-height:1.5;color:var(--dim)}#brief .sum b{color:var(--ink)}
+#brief.done{border-color:color-mix(in srgb,var(--ok,#5be28a) 55%,transparent);background:rgba(91,226,138,.05)}
+#brief.done .bn{background:var(--ok,#5be28a)}#brief.done .bh em{color:var(--ok,#5be28a);border-color:color-mix(in srgb,var(--ok,#5be28a) 55%,transparent)}
+#brief .form{display:flex;flex-direction:column;gap:6px}
+#brief .bh{flex-wrap:wrap;row-gap:4px}#brief .tbtn{white-space:normal;height:auto;min-height:34px;padding:7px 10px;line-height:1.25;text-align:center}
+#brief.done:not(.edit) .form{display:none}
+#brief:not(.done) .sum,#brief.edit .sum,#brief:not(.done) #brEdit,#brief.edit #brEdit{display:none}
+#pal.locked .ph,#pal.locked #plist,#pal.locked #pf{opacity:.32;pointer-events:none;filter:grayscale(.6)}
+#rb{position:fixed;inset:0;z-index:95;display:none;align-items:center;justify-content:center;background:rgba(5,8,12,.8);backdrop-filter:blur(5px);padding:14px}
+#rb.on{display:flex}
+#rb .box{width:min(560px,100%);max-height:100%;overflow:auto;border:1px solid color-mix(in srgb,var(--warn) 60%,transparent);border-radius:16px;background:rgba(10,14,19,.98);padding:18px;display:flex;flex-direction:column;gap:10px}
+#rb h2{margin:0;font-size:16px}#rb .lead{margin:0;font-size:12px;color:var(--dim);line-height:1.5}#rb label{font-size:12px}
+#rb .act{display:flex;gap:8px;justify-content:flex-end}
 </style>
 </head>
 <body class="nopal">
+<div id="rb" role="dialog" aria-modal="true" aria-labelledby="rbT"><div class="box">
+  <h2 id="rbT" data-i="rbTitle"></h2><p class="lead" data-i="rbLead"></p>
+  <label for="rbGoal" data-i="brGoalL"></label><textarea id="rbGoal" maxlength="2000"></textarea>
+  <label for="rbDel" data-i="brDelL"></label><textarea id="rbDel" maxlength="2000"></textarea>
+  <div class="act"><button class="tbtn" id="rbNo"><span data-i="planCancel"></span></button><button class="tbtn go big" id="rbOk"><span data-i="rbOk"></span></button></div>
+</div></div>
 <div id="guide" role="dialog" aria-modal="true" aria-labelledby="gT"><div class="box">
   <h2 id="gT" data-i="gTitle"></h2><p class="lead" data-i="gLead"></p>
   <div class="steps">
-    <div class="st"><b><i>1</i><span data-i="g1t"></span></b><p data-i="g1d"></p></div>
-    <div class="st"><b><i>2</i><span data-i="g2t"></span></b><p data-i="g2d"></p></div>
-    <div class="st"><b><i>3</i><span data-i="g3t"></span></b><p data-i="g3d"></p></div>
+    <div class="st"><b><i>1</i><span data-i="g0t"></span></b><p data-i="g0d"></p></div>
+    <div class="st"><b><i>2</i><span data-i="g1t"></span></b><p data-i="g1d"></p></div>
+    <div class="st"><b><i>3</i><span data-i="g2t"></span></b><p data-i="g2d"></p></div>
+    <div class="st"><b><i>4</i><span data-i="g3t"></span></b><p data-i="g3d"></p></div>
   </div>
   <div class="words" data-h="gWords"></div>
   <div class="act"><label><input type="checkbox" id="gNever" checked><span data-i="gNever"></span></label><button class="tbtn go big" id="gOk"><span data-i="gOk"></span></button></div>
@@ -297,6 +325,11 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 
 <div id="main">
   <aside id="pal">
+    <div id="brief"><div class="bh"><span class="bn">1</span><b data-i="brTitle"></b><em data-i="brMust"></em></div>
+      <div class="sum" id="brSum"></div><button class="tbtn" id="brEdit"><span data-i="brEdit"></span></button>
+      <div class="form"><label for="brGoal" data-i="brGoalL"></label><textarea id="brGoal" maxlength="2000"></textarea>
+        <label for="brDel" data-i="brDelL"></label><textarea id="brDel" maxlength="2000"></textarea>
+        <button class="tbtn go big" id="brOk"><span data-i="brOk"></span></button></div></div>
     <div class="ph"><div class="f"><svg class="ic"><use href="#i-search"/></svg><input id="q" placeholder="search  ( / )" autocomplete="off" spellcheck="false"></div><button class="ibtn" id="bRescan" title="Rescan"><svg class="ic"><use href="#i-refresh"/></svg></button></div>
     <div id="plist"></div>
     <div id="pf">
@@ -316,7 +349,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
       <canvas id="cv"></canvas>
       <div id="nodes"></div>
       <div id="empty"><div class="eb"><svg class="ic"><use href="#i-wand"/></svg><h3 data-i="emptyA"></h3>
-        <ol><li data-i="e1"></li><li data-i="e2"></li><li data-i="e3"></li></ol>
+        <ol><li data-i="e0"></li><li data-i="e1"></li><li data-i="e2"></li><li data-i="e3"></li></ol>
         <button class="tbtn go" id="eCat"><span data-i="eCat"></span></button><button class="tbtn" id="eGuide"><span data-i="bHelpT"></span></button></div></div>
       <div id="hint"></div>
       <div id="plan" role="dialog" aria-modal="true" aria-labelledby="planT"><div class="box">
@@ -355,7 +388,11 @@ const TAU = Math.PI * 2;
 
 const TOKEN = document.querySelector('meta[name=flow-token]')?.content || '';
 const L = {
-  en: { selNone: 'Tick at least one item above', palHint: '<b>How?</b> Tick what you want to use, then click “Create my pipeline”.', rawLbl: 'Add my own action', modeLbl: 'Order', bBuildT: 'Create my pipeline', bGoT: 'Create & run', bAddT: 'Add to current',
+  en: { brTitle: 'Project brief', brMust: 'MANDATORY', brGoalL: 'General prompt of the target project: what is the expected objective?', brDelL: 'Which deliverables are expected after the run?', brOk: 'Validate the brief and choose items', brEdit: 'Edit brief', brSaved: 'Brief saved · you can choose items', brNeed: 'Describe the project first: objective AND expected deliverables.', brGoalS: 'Objective:', brDelS: 'Deliverables:', brLocked: 'Validate the project brief first (step 1)',
+    brGoalPh: 'e.g. my site must be checked then published this week', brDelPh: 'e.g. check report (report.md), deployed site, updated changelog',
+    rbTitle: 'Before launching: confirm the run brief', rbLead: 'This confirmation is asked at every launch, even for a single step or an existing pipeline. The AI assistant receives this brief.', rbOk: 'Confirm and launch',
+    g0t: 'Describe your project', g0d: 'Expected objective and expected deliverables: mandatory, asked again at every launch.', e0: 'Describe your project (objective and expected deliverables): mandatory.',
+    selNone: 'Tick at least one item above', palHint: '<b>How?</b> Tick what you want to use, then click “Create my pipeline”.', rawLbl: 'Add my own action', modeLbl: 'Order', bBuildT: 'Create my pipeline', bGoT: 'Create & run', bAddT: 'Add to current',
     bRunT: 'Run all', bStopT: 'Stop', bApproveT: 'Autonomous', bHelpT: 'Help', hostLbl: 'AI assistant', e1: 'Open the catalog and tick what you want to use.', e2: 'Click “Create my pipeline”: a plan is proposed, you validate it.', e3: 'Click a step to run it, or “Run all”.', eCat: 'Open the catalog',
     gd_pipeline: 'Already organised: one click to open.', gd_custom: 'What you added yourself below.', gd_skill: 'Know-how of your AI assistant. Click the title to tick all.', gd_command: 'Assistant shortcuts (/…). Click the title to tick all.', gd_script: 'Project actions: tests, build… Click the title to tick all.', gd_ref: 'Documents read to give context.',
     gTitle: 'Welcome to VTLO-visutool', gLead: 'This tool organises actions for your AI assistant and shows what happens live. Nothing starts without your approval.', g1t: 'Pick', g1d: 'In the catalog on the left, tick items to use, or click a ready-made pipeline to open it as is.', g2t: 'Validate the plan', g2d: 'A plan is proposed: which steps, in what order, which in parallel. Remove any, then validate.', g3t: 'Run & follow', g3d: 'Click a step to run it, or “Run all”. Steps animate while working; the log shows details.',
@@ -371,7 +408,11 @@ const L = {
     risky: 'These commands look destructive:\n\n{0}\n\nRun anyway?', selNode: 'Select a node (the i button on a node) to edit what it runs.', content: 'content', loading: 'loading…', cmdLbl: 'shell command', promptLbl: 'prompt override (empty = automatic)',
     argsLbl: 'arguments', argsPh: 'passed to the skill / command', after: 'runs after', run: 'run', runFrom: 'run from here', save: 'save', remove: 'remove', clickRun: 'click to run', hint: '<b>click</b> run · <b>shift-click</b> run from here · <b>i</b> edit', tipInfo: 'Edit / details',
     ty_skill: 'skill', ty_command: 'command', ty_script: 'script', ty_prompt: 'prompt', ty_ref: 'ref' },
-  fr: { pipe: 'Enchaînement', nodes: 'étapes', idle: 'Prêt', running: 'En cours', failed: 'Échec', done: 'Terminé', finished_err: 'terminé avec des erreurs',
+  fr: { brTitle: 'Brief du projet', brMust: 'OBLIGATOIRE', brGoalL: "Prompt général du projet visé : quel est l'objectif attendu ?", brDelL: 'Quels livrables attendus après le run ?', brOk: 'Valider le brief et choisir les éléments', brEdit: 'Modifier le brief', brSaved: 'Brief enregistré · tu peux choisir des éléments', brNeed: "Décris d'abord le projet : objectif ET livrables attendus.", brGoalS: 'Objectif :', brDelS: 'Livrables :', brLocked: "Valide d'abord le brief du projet (étape 1)",
+    brGoalPh: 'Ex. : mon site vitrine doit être vérifié puis mis en ligne cette semaine', brDelPh: 'Ex. : rapport de vérification (rapport.md), site déployé, changelog à jour',
+    rbTitle: 'Avant de lancer : confirme le brief du run', rbLead: "Cette confirmation est demandée à chaque lancement, même pour une seule étape ou un enchaînement existant. L'assistant IA reçoit ce brief.", rbOk: 'Confirmer et lancer',
+    g0t: 'Décris ton projet', g0d: "Objectif attendu et livrables attendus : étape obligatoire, redemandée à chaque lancement.", e0: "Décris ton projet (objectif et livrables attendus) : c'est obligatoire.",
+    pipe: 'Enchaînement', nodes: 'étapes', idle: 'Prêt', running: 'En cours', failed: 'Échec', done: 'Terminé', finished_err: 'terminé avec des erreurs',
     nobin: "« {0} » n'est pas installé sur cet appareil", approveTip: "Mode autonome : l'assistant IA peut modifier des fichiers et lancer des commandes sans te demander à chaque fois. Désactivé = plus prudent, mais certaines étapes peuvent être bloquées.", palTip: 'Afficher / masquer le catalogue  ( / )',
     runTip: "Lancer toutes les étapes de l'enchaînement", stopTip: 'Tout arrêter maintenant', search: 'Rechercher…  ( / )', rescanTip: 'Actualiser la liste', raw: 'Ex. : npm test · ?résume ce projet · https://… · docs/guide.md',
     modeTip: 'Comment relier les éléments cochés ?', auto: 'Automatique (conseillé)', seq: "L'un après l'autre", par: 'Tous en même temps', addTip: "Ajouter les éléments cochés à l'enchaînement déjà ouvert", buildTip: 'Propose un plan avec les éléments cochés (rien ne démarre sans ton accord)', goTip: 'Propose un plan puis le lance dès que tu le valides',
@@ -380,10 +421,10 @@ const L = {
     g_pipeline: 'Enchaînements prêts', g_custom: 'Mes ajouts', g_skill: 'Compétences', g_command: 'Commandes', g_script: 'Scripts du projet', g_ref: 'Documents',
     gd_pipeline: "Déjà organisés : un clic et c'est ouvert.", gd_custom: 'Ce que tu as ajouté toi-même ci-dessous.', gd_skill: "Savoir-faire de ton assistant IA. Clique le titre pour tout cocher.", gd_command: 'Raccourcis de ton assistant (/…). Clique le titre pour tout cocher.', gd_script: 'Actions du projet : tests, build… Clique le titre pour tout cocher.', gd_ref: 'Documents lus pour donner du contexte aux étapes.',
     workflow: 'workflow', nNodes: '{0} étapes', more: "+{0} autres — précise ta recherche", none: "Rien trouvé. Tape une commande, un chemin ou une adresse web dans la case du bas.", pickFirst: "Coche d'abord au moins un élément dans le catalogue",
-    palHint: "<b>Comment faire ?</b> Coche ce que tu veux utiliser, puis clique sur « Créer mon enchaînement ».", rawLbl: 'Ajouter ma propre action', modeLbl: 'Ordre', bBuildT: 'Créer mon enchaînement', bGoT: 'Créer et lancer', bAddT: "Ajouter à l'actuel",
+    palHint: "<b>Ensuite :</b> coche ce que tu veux utiliser, puis clique sur « Créer mon enchaînement ».", rawLbl: 'Ajouter ma propre action', modeLbl: 'Ordre', bBuildT: 'Créer mon enchaînement', bGoT: 'Créer et lancer', bAddT: "Ajouter à l'actuel",
     bRunT: 'Tout lancer', bStopT: 'Arrêter', bApproveT: 'Autonome', bHelpT: 'Aide', hostLbl: 'Assistant IA',
     e1: "Ouvre le catalogue et coche ce que tu veux utiliser (compétences, scripts, documents).", e2: "Clique sur « Créer mon enchaînement » : un plan t'est proposé, tu le valides.", e3: "Clique sur une étape pour la lancer, ou sur « Tout lancer ».", eCat: 'Ouvrir le catalogue',
-    gTitle: 'Bienvenue dans VTLO-visutool', gLead: "Cet outil organise des actions pour ton assistant IA et te montre ce qui se passe, en direct. Rien ne démarre sans ton accord.",
+    gTitle: 'Bienvenue dans VTLO-visutool', gLead: "Cet outil organise des actions pour ton assistant IA et te montre ce qui se passe, en direct. Il te demande d'abord ton objectif et tes livrables, et rien ne démarre sans ton accord.",
     g1t: 'Choisis', g1d: "Dans le catalogue à gauche, coche les éléments à utiliser. Ou clique sur un enchaînement déjà prêt pour l'ouvrir tel quel.",
     g2t: 'Valide le plan', g2d: "L'outil propose un plan : quelles étapes, dans quel ordre, lesquelles en même temps. Tu peux en retirer, puis valider.",
     g3t: 'Lance et suis', g3d: "Clique sur une étape pour la lancer, ou sur « Tout lancer ». Les étapes s'animent pendant le travail ; le journal en bas montre les détails.",
@@ -401,7 +442,7 @@ try { LANG = localStorage.getItem('flow-lang') || ''; } catch (e) { /* storage b
 if (LANG !== 'fr' && LANG !== 'en') LANG = 'fr';
 const t = (k, ...a) => (L[LANG][k] ?? L.en[k] ?? k).replace(/\{(\d)\}/g, (_, i) => a[+i] ?? '');
 const S = { pipeline: null, states: {}, items: [], pipelines: [], host: 'claude', hosts: {}, autoApprove: false,
-  proposal: null, sel: null, selected: new Map(), tab: 'log', filterSel: false, startedAt: 0 };
+  proposal: null, brief: null, briefEdit: false, sel: null, selected: new Map(), tab: 'log', filterSel: false, startedAt: 0 };
 
 /* ───────── api ───────── */
 async function api(route, body) {
@@ -409,7 +450,7 @@ async function api(route, body) {
     ? { method: 'POST', headers: { 'content-type': 'application/json', 'x-flow': '1', 'x-flow-token': TOKEN }, body: JSON.stringify(body) }
     : { headers: { 'x-flow': '1', 'x-flow-token': TOKEN } });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || r.statusText);
+  if (!r.ok) throw new Error(/^brief_required/.test(j.error || '') ? t('brNeed') : (j.error || r.statusText));
   return j;
 }
 let toastT;
@@ -464,8 +505,9 @@ function renderPalette() {
   }
   $('#plist').innerHTML = (S.selected.size || S.pipeline ? '' : `<div class="phint">${t('palHint')}</div>`) + (h || `<div class="more" style="padding:16px 12px">${t('none')}</div>`);
   const nsel = S.selected.size;
-  $('#selc').textContent = nsel ? t('selected', nsel) : t('selNone');
-  $('#bBuild').disabled = $('#bGo').disabled = $('#bAdd').disabled = !nsel;
+  const bok = !!S.brief?.confirmed;
+  $('#selc').textContent = !bok ? t('brLocked') : nsel ? t('selected', nsel) : t('selNone');
+  $('#bBuild').disabled = $('#bGo').disabled = $('#bAdd').disabled = !nsel || !bok;
   $('#bAdd').hidden = !S.pipeline;
 }
 $('#plist').addEventListener('click', guard(async (e) => {
@@ -531,8 +573,8 @@ function renderPlan() {
 }
 const planExclude = () => [...document.querySelectorAll('#planBody input:not(:checked)')].map((c) => c.dataset.id);
 async function planValidate(run) {
-  if (run && !confirmRisky(S.proposal.pipeline.nodes)) return;
-  const r = await api('validate', { exclude: planExclude(), run: !!run });
+  let brief; if (run) { brief = await askBrief(); if (!brief) return; if (!confirmRisky(S.proposal.pipeline.nodes)) return; }
+  const r = await api('validate', { exclude: planExclude(), run: !!run, brief });
   S.proposal = null; renderPlan();
   toast(t('validated', r.pipeline?.nodes.length || 0));
   if (run) { S.startedAt = Date.now(); openLog(); }
@@ -554,7 +596,7 @@ $('#bApprove').onclick = guard(async () => {
   if (on && !confirm(t('approveQ'))) return;
   await api('approve', { on });
 });
-$('#bRun').onclick = guard(async () => { if (!nodes().length) return toast(t('nothing')); if (!confirmRisky(nodes())) return; S.startedAt = Date.now(); await api('run', { all: true }); openLog(); });
+$('#bRun').onclick = guard(async () => { if (!nodes().length) return toast(t('nothing')); const brief = await askBrief(); if (!brief) return; if (!confirmRisky(nodes())) return; S.startedAt = Date.now(); await api('run', { all: true, brief }); openLog(); });
 $('#bStop').onclick = guard(() => api('stop', {}));
 
 function confirmRisky(list) {
@@ -567,9 +609,10 @@ async function runNode(id, from) {
   const st = status(id);
   if (st === 'running' || st === 'queued') { await api('stop', { node: id }); return; }
   if (n.type === 'ref') { selectNode(id, true); return; }
+  const brief = await askBrief(); if (!brief) return;
   if (!confirmRisky(from ? nodes() : [n])) return;
   if (!isBusy()) S.startedAt = Date.now();
-  await api('run', from ? { from: id } : { node: id });
+  await api('run', from ? { from: id, brief } : { node: id, brief });
   openLog();
 }
 
@@ -884,7 +927,7 @@ function applyPipeline(p) { S.pipeline = p; layout(); renderNodes(); renderHeade
 async function resync() {
   const s = await api('state');
   S.items = s.items; S.pipelines = s.pipelines; S.states = s.states || {};
-  applySettings(s); applyPipeline(s.pipeline); renderPalette(); S.proposal = s.proposal || null; renderPlan();
+  applySettings(s); applyPipeline(s.pipeline); renderPalette(); S.proposal = s.proposal || null; S.brief = s.brief || null; renderBrief(); renderPalette(); renderPlan();
   if (!s.pipeline) document.body.classList.remove('nopal');
   $('#bPal').setAttribute('aria-pressed', !document.body.classList.contains('nopal'));
   if (!$('#log').childElementCount) (s.logs || []).forEach(pushLog);
@@ -894,6 +937,7 @@ function connect() {
   const es = new EventSource('/api/events?t=' + encodeURIComponent(TOKEN));
   es.onopen = () => resync().catch((e) => { console.error(e); toast(e.message, true); });
   es.addEventListener('pipeline', (e) => { applyPipeline(JSON.parse(e.data)); api('state').then((s) => { S.states = s.states || {}; S.pipelines = s.pipelines; paintStates(); renderPalette(); }).catch(() => {}); });
+  es.addEventListener('brief', (e) => { S.brief = JSON.parse(e.data); renderBrief(); renderPalette(); });
   es.addEventListener('proposal', (e) => { S.proposal = JSON.parse(e.data); renderPlan(); });
   es.addEventListener('settings', (e) => applySettings(JSON.parse(e.data)));
   es.addEventListener('state', (e) => { const s = JSON.parse(e.data); const wasBusy = isBusy(); S.states[s.node] = s; if (!wasBusy && isBusy() && !S.startedAt) S.startedAt = Date.now(); paintStates(); });
@@ -921,8 +965,36 @@ function applyLang() {
   $('#q').placeholder = t('search'); $('#raw').placeholder = t('raw');
   const o = $('#mode').options; o[0].textContent = t('auto'); o[1].textContent = t('seq'); o[2].textContent = t('par');
   $('#tLog').textContent = t('tLog'); $('#tNode').textContent = t('tNode'); $('#fSel').textContent = t('onlySel');
-  renderHeader(); renderPalette(); renderNodes(); if (S.tab === 'node') renderDetail(); if (S.proposal) renderPlan();
+  renderHeader(); renderPalette(); renderBrief(); renderNodes(); if (S.tab === 'node') renderDetail(); if (S.proposal) renderPlan();
 }
+/* project brief: mandatory before choosing items, re-confirmed at every run launch */
+function renderBrief() {
+  const b = S.brief, ok = !!b?.confirmed, el = $('#brief');
+  el.classList.toggle('done', ok); el.classList.toggle('edit', S.briefEdit);
+  $('#pal').classList.toggle('locked', !ok);
+  $('#brGoal').placeholder = t('brGoalPh'); $('#brDel').placeholder = t('brDelPh');
+  if (b && !S.briefEdit && document.activeElement !== $('#brGoal') && document.activeElement !== $('#brDel')) { $('#brGoal').value = b.goal; $('#brDel').value = b.deliverables; }
+  $('#brSum').innerHTML = ok ? `<b>${t('brGoalS')}</b> ${esc(b.goal.length > 120 ? b.goal.slice(0, 120) + '…' : b.goal)}<br><b>${t('brDelS')}</b> ${esc(b.deliverables.length > 120 ? b.deliverables.slice(0, 120) + '…' : b.deliverables)}` : '';
+  if (!ok) document.body.classList.remove('nopal');
+}
+$('#brOk').onclick = guard(async () => {
+  const goal = $('#brGoal').value.trim(), deliverables = $('#brDel').value.trim();
+  if (!goal || !deliverables) { toast(t('brNeed'), true); return; }
+  const r = await api('brief', { goal, deliverables }); S.brief = r.brief; S.briefEdit = false; renderBrief(); renderPalette(); toast(t('brSaved'));
+});
+$('#brEdit').onclick = () => { S.briefEdit = true; renderBrief(); $('#brGoal').focus(); };
+function askBrief() { // resolves with {goal, deliverables} once confirmed for THIS launch, or null
+  return new Promise((resolve) => {
+    if ($('#rb').classList.contains('on')) return resolve(null);
+    S.rbRes = resolve; $('#rbGoal').value = S.brief?.goal || ''; $('#rbDel').value = S.brief?.deliverables || '';
+    $('#rbGoal').placeholder = t('brGoalPh'); $('#rbDel').placeholder = t('brDelPh');
+    $('#rb').classList.add('on'); ($('#rbGoal').value ? $('#rbOk') : $('#rbGoal')).focus();
+  });
+}
+const closeRb = (v) => { $('#rb').classList.remove('on'); const r = S.rbRes; S.rbRes = null; r?.(v); };
+$('#rbOk').onclick = () => { const goal = $('#rbGoal').value.trim(), deliverables = $('#rbDel').value.trim(); if (!goal || !deliverables) { toast(t('brNeed'), true); return; } closeRb({ goal, deliverables }); };
+$('#rbNo').onclick = () => closeRb(null);
+$('#rb').addEventListener('click', (e) => { if (e.target.id === 'rb') closeRb(null); });
 /* beginner guide */
 const guideSeen = () => { try { return localStorage.getItem('flow-guide') === '1'; } catch (e) { return false; } };
 const openGuide = () => { $('#guide').classList.add('on'); $('#gOk').focus(); };
@@ -930,7 +1002,7 @@ const closeGuide = () => { $('#guide').classList.remove('on'); try { if ($('#gNe
 $('#gOk').onclick = closeGuide; $('#bHelp').onclick = openGuide; $('#eGuide').onclick = openGuide;
 $('#eCat').onclick = () => { document.body.classList.remove('nopal'); $('#bPal').setAttribute('aria-pressed', true); setTimeout(resize, 260); };
 $('#guide').addEventListener('click', (e) => { if (e.target.id === 'guide') closeGuide(); });
-addEventListener('keydown', (e) => { if (e.key === 'Escape') { if ($('#guide').classList.contains('on')) closeGuide(); else if (S.proposal) $('#planNo').click(); } });
+addEventListener('keydown', (e) => { if (e.key === 'Escape') { if ($('#rb').classList.contains('on')) closeRb(null); else if ($('#guide').classList.contains('on')) closeGuide(); else if (S.proposal) $('#planNo').click(); } });
 window.__guideOnce = () => { if (!guideSeen() && !window.__guided) { window.__guided = 1; setTimeout(openGuide, 3200); } };
 $('#bLang').onclick = () => { LANG = LANG === 'fr' ? 'en' : 'fr'; try { localStorage.setItem('flow-lang', LANG); } catch (e) { /* ignore */ } applyLang(); };
 setTab('log');

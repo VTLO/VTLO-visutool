@@ -41,6 +41,8 @@ Palette: tick items → wand = new pipeline, + = append. Free input accepts shel
 
 The UI is **French by default** (EN via the FR/EN button or `FLOW_LANG=en`), with a first-run 3-step guide, plain-language labels and a tick-list catalog.
 
+**Mandatory project brief.** Before choosing items you describe the target project (general prompt, expected objective) and the **expected deliverables**. The brief is re-confirmed at **every run launch** (even a single step or an existing pipeline), sent to the AI assistant and saved as `.flow/runs/<stamp>/brief.md`. CLI: `--goal "…" --deliverables "…"` (or `flow brief`); `plan`, `validate --run`, `go` and `run` are refused without it.
+
 **Mandatory plan validation.** Selecting items never builds a pipeline directly: a plan is *proposed* (steps, parallel groups, why each step sits where it does) and you must validate it — in the app (modal: untick a step, change the mode, Validate / Validate & run / Cancel) or in chat/terminal (`flow validate`, `flow cancel`). Existing pipelines open as-is. `--yes` pre-validates for automation and must be passed explicitly.
 
 ## How nodes execute

@@ -25,6 +25,10 @@ const IS_WIN = process.platform === 'win32';
 let LANG = /^en/i.test(process.env.FLOW_LANG || '') ? 'en' : 'fr'; // français par défaut ; anglais : FLOW_LANG=en ou --lang en
 const MSG = {
   en: {
+    brief_head: '── PROJECT BRIEF (mandatory before choosing items and before every run) ──',
+    brief_goal: 'General prompt: what is the project and the expected objective? ', brief_del: 'Expected deliverables after the run? ',
+    needbrief: 'Project brief required: pass --goal "<objective>" --deliverables "<expected deliverables>" (asked at every run).',
+    briefset: 'brief recorded', brief_run: (g, d) => `RUN BRIEF\n  Objective   : ${g}\n  Deliverables: ${d}`, brief_ok: 'Confirm this brief and launch? [y/N] ',
     ty_skill: 'skill', ty_command: 'command', ty_script: 'script', ty_prompt: 'prompt', ty_ref: 'document',
     plan_head: (n, m, c) => `PLAN PROPOSAL — '${n}' · mode ${m} · ${c} steps   (nothing is built until you validate)`,
     plan_next: 'Validate: flow validate   ·   adjust: flow plan … --mode seq|par   ·   drop a step: flow validate --exclude <id>   ·   cancel: flow cancel',
@@ -47,6 +51,7 @@ Easy:
   flow update                   pull the latest version and reinstall
 
 More:
+  flow brief  --goal "…" --deliverables "…"   MANDATORY project brief (objective + expected deliverables): before choosing items and at EVERY run
   flow plan   [--items a,b] [--mode auto|seq|par]   propose a plan (mandatory step)  ·  flow validate [--run] [--exclude id,id]  ·  flow cancel
   flow open   [--load NAME] [--items a,b] [--import wf.md] [--mode auto|seq|par] [--name N] [--host H] [--run] [--no-open]
   flow run    [NAME | --items a,b,c] [--approve]      headless, no UI
@@ -57,6 +62,10 @@ More:
 Config (optional): ~/.flow/config.json or <project>/.flow/config.json — see README.`,
   },
   fr: {
+    brief_head: '── BRIEF DU PROJET (obligatoire avant de choisir des éléments et à chaque lancement) ──',
+    brief_goal: "Prompt général : quel est le projet visé et l'objectif attendu ? ", brief_del: 'Quels livrables attendus après le run ? ',
+    needbrief: 'Brief du projet obligatoire : ajoute --goal "<objectif>" --deliverables "<livrables attendus>" (demandé à chaque run).',
+    briefset: 'brief enregistré', brief_run: (g, d) => `BRIEF DU RUN\n  Objectif  : ${g}\n  Livrables : ${d}`, brief_ok: 'Confirmer ce brief et lancer ? [o/N] ',
     ty_skill: 'compétence', ty_command: 'commande', ty_script: 'script', ty_prompt: 'consigne', ty_ref: 'document',
     plan_head: (n, m, c) => `PLAN PROPOSÉ — '${n}' · mode ${m} · ${c} étapes   (rien n'est construit avant ta validation)`,
     plan_next: 'Valider : flow validate   ·   ajuster : flow plan … --mode seq|par   ·   retirer une étape : flow validate --exclude <id>   ·   annuler : flow cancel',
@@ -66,7 +75,7 @@ Config (optional): ~/.flow/config.json or <project>/.flow/config.json — see RE
     needval: "Plan pas encore validé. Valide dans l'appli, lance `flow validate`, ou relance avec --yes.", waiting: "en attente de ta validation (dans l'appli, ou : flow validate)",
     validated: 'plan validé — pipeline construit', tty: "pas de terminal : impossible de demander la validation ici",
     hint: 'clic sur un nœud = l\'exécuter · ▶ = tout lancer · maj+clic = lancer à partir de là', nopipe: 'aucun pipeline — choisis des éléments dans la palette (panneau de gauche)',
-    nodes: 'nœuds', unresolved: 'introuvable', didyou: 'tu voulais dire', nobrowser: '(impossible d\'ouvrir un navigateur automatiquement — ouvre l\'URL ci-dessus)',
+    nodes: 'étapes', unresolved: 'introuvable', didyou: 'tu voulais dire', nobrowser: '(impossible d\'ouvrir un navigateur automatiquement — ouvre l\'URL ci-dessus)',
     done: 'Terminé. Redémarre ta session CLI, puis tape  /flow', engine: 'moteur', removed: 'supprimé', running: 'exécution', nosrv: 'aucun serveur flow actif — lance : flow open',
     updated: 'mis à jour depuis git', noGit: 'pas un dépôt git : retélécharge le projet puis lance `flow install`',
     help: (v) => `VTLO-visutool ${v} — transforme n'importe quel workflow / pipeline / skills en appli web 3D cliquable
@@ -79,6 +88,7 @@ Facile :
   flow update                   récupère la dernière version et réinstalle
 
 Plus :
+  flow brief  --goal "…" --deliverables "…"   brief du projet OBLIGATOIRE (objectif + livrables attendus) : avant de choisir des éléments et À CHAQUE run
   flow plan   [--items a,b] [--mode auto|seq|par]   propose un plan (étape obligatoire)  ·  flow validate [--run] [--exclude id,id]  ·  flow cancel
   flow open   [--load NOM] [--items a,b] [--import wf.md] [--mode auto|seq|par] [--name N] [--host H] [--run] [--no-open]
   flow run    [NOM | --items a,b,c] [--approve]      sans interface (headless)
@@ -452,7 +462,7 @@ function ancestors(pipeline, id, pick) {
   return out;
 }
 
-function nodePrompt(node, hostCfg, pipeline, outFiles) {
+function nodePrompt(node, hostCfg, pipeline, outFiles, brief) {
   const args = node.args ? String(node.args) : '';
   let prompt = node.prompt;
   let withContext = true;
@@ -473,6 +483,7 @@ function nodePrompt(node, hostCfg, pipeline, outFiles) {
       if (refs.length) prompt += `\nReference documents to consult: ${refs.join(', ')}`;
       if (ups.length) prompt += `\nOutput of earlier pipeline steps (read if relevant):\n${ups.map(([d, f]) => `- ${d}: ${f}`).join('\n')}`;
     }
+    if (brief) prompt += `\n\n[project brief]\nOverall project / objective: ${brief.goal}\nExpected deliverables after the run: ${brief.deliverables}\nWork toward this objective; produce the deliverables that belong to your step, and say in your final summary which ones you produced.`;
   }
   return prompt;
 }
@@ -489,7 +500,7 @@ function buildSpec(node, app) {
     return node.command ? { kind: 'shell', command: node.command, display: `$ ${node.command}` } : { kind: 'none', error: 'script node has no command' };
   }
   if (node.type === 'ref') return { kind: 'none', display: `ref  ${node.path || node.url || node.name}` };
-  const prompt = nodePrompt(node, hostCfg, app.pipeline, app.outFiles);
+  const prompt = nodePrompt(node, hostCfg, app.pipeline, app.outFiles, app.runBrief);
   const argv = hostArgv(hostCfg, prompt, app.autoApprove);
   let pty = hostCfg.pty === true || (hostCfg.pty === 'auto' && !!which('script') && !IS_WIN);
   return { kind: 'host', bin: hostCfg.bin, argv, pty, display: `$ ${hostCfg.bin} ${argv.map((a) => (/[\s"'`$]/.test(a) ? JSON.stringify(clip(a, 140)) : a)).join(' ')}` };
@@ -514,7 +525,9 @@ class Runner extends EventEmitter {
     const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
     const dir = path.join(this.app.cwd, '.flow', 'runs', `${stamp}-${this.app.pipeline?.name || 'run'}`);
     fs.mkdirSync(dir, { recursive: true });
-    this.batch = { dir, started: Date.now(), nodes: {} };
+    this.batch = { dir, started: Date.now(), nodes: {}, brief: this.app.runBrief };
+    try { const b = this.app.runBrief; if (b) fs.writeFileSync(path.join(dir, 'brief.md'), `# Brief du run\n\n## Objectif\n${b.goal}\n\n## Livrables attendus\n${b.deliverables}\n`); } catch { /* best effort */ }
+    if (this.app.runBrief) { this.log('flow', 'sys', `Objectif : ${clip(this.app.runBrief.goal, 200)}`); this.log('flow', 'sys', `Livrables attendus : ${clip(this.app.runBrief.deliverables, 200)}`); }
     this.stopping = false;
     this.emit('run', { status: 'start' });
   }
@@ -523,8 +536,9 @@ class Runner extends EventEmitter {
     const b = this.batch; this.batch = null;
     const nodes = b.nodes;
     const ok = Object.values(nodes).every((n) => n.status === 'done' || n.status === 'skipped-ok');
-    const summary = { pipeline: this.app.pipeline?.name, host: this.app.host, started: b.started, ms: Date.now() - b.started, ok, nodes, dir: b.dir };
+    const summary = { brief: b.brief, pipeline: this.app.pipeline?.name, host: this.app.host, started: b.started, ms: Date.now() - b.started, ok, nodes, dir: b.dir };
     try { writeJson(path.join(b.dir, 'summary.json'), summary); writeJson(path.join(this.app.cwd, '.flow', 'last-run.json'), summary); } catch { /* best effort */ }
+    this.log('flow', 'sys', `Livrables attendus : ${clip(b.brief?.deliverables || '', 200)} — résultats et brief : ${path.relative(this.app.cwd, b.dir)}`);
     this.emit('run', { status: 'end', ok, ms: summary.ms });
   }
 
@@ -532,6 +546,7 @@ class Runner extends EventEmitter {
   runSet(ids, respectDeps) {
     const p = this.app.pipeline;
     if (!p) throw new Error('no pipeline loaded');
+    this.app.consumeArm(); // every launch needs a freshly confirmed project brief
     ids = ids.filter((id) => p.nodes.some((n) => n.id === id) && !['running', 'queued'].includes(this.states[id]?.status));
     if (!ids.length) return Promise.resolve();
     this.begin();
@@ -658,6 +673,8 @@ class App extends EventEmitter {
     this.autoApprove = false;
     this.pipeline = null;
     this.proposal = null; // pending plan awaiting validation
+    { const b = readJson(path.join(cwd, '.flow', 'brief.json')); this.brief = b?.goal ? { goal: b.goal, deliverables: b.deliverables || '', confirmed: false } : null; } // prefilled, must be confirmed each session
+    this.armed = false; this.runBrief = null;
     this.outFiles = {};
     this.logs = [];
     this._scan = null;
@@ -695,7 +712,7 @@ class App extends EventEmitter {
     return {
       v: VERSION, cwd: this.cwd, ...this.settings(), pipeline: this.pub(), states: this.runner.states,
       items: items.map((i) => ({ key: i.key, type: i.type, name: i.name, desc: clip(i.desc, 140), hosts: i.hosts })),
-      pipelines, logs: this.logs.slice(-500), running: this.runner.busy(), proposal: this.pubProposal(),
+      pipelines, logs: this.logs.slice(-500), running: this.runner.busy(), proposal: this.pubProposal(), brief: this.pubBrief(),
     };
   }
 
@@ -786,7 +803,28 @@ class App extends EventEmitter {
     return { proposal: this.plan(spec), pipeline: this.pub(), unresolved };
   }
 
+  /** Project brief: general prompt + expected objective + expected deliverables. Mandatory before items are chosen and at every run. */
+  setBrief(b) {
+    const goal = String(b?.goal ?? '').trim(), deliverables = String(b?.deliverables ?? '').trim();
+    if (!goal || !deliverables) throw new Error('brief_required: describe the project/objective AND the expected deliverables');
+    this.brief = { goal, deliverables, confirmed: true, at: Date.now() };
+    try { writeJson(path.join(this.cwd, '.flow', 'brief.json'), { goal, deliverables, at: this.brief.at }); } catch { /* best effort */ }
+    this.emit('brief', this.pubBrief());
+    return this.pubBrief();
+  }
+  pubBrief() { return this.brief ? { goal: this.brief.goal, deliverables: this.brief.deliverables, confirmed: !!this.brief.confirmed } : null; }
+  /** Called by every run entry point: the brief must be (re)confirmed for THIS launch. */
+  armRun(b) {
+    if (b) this.setBrief(b);
+    if (!this.brief?.goal || !this.brief?.deliverables) throw new Error('brief_required: confirm the project brief (objective + expected deliverables) before running');
+    if (!b) throw new Error('brief_required: confirm the project brief for this run');
+    this.armed = true; this.runBrief = { goal: this.brief.goal, deliverables: this.brief.deliverables };
+  }
+  consumeArm() { if (!this.armed) throw new Error('brief_required: confirm the project brief (objective + expected deliverables) before every run'); this.armed = false; }
+
   plan(spec = {}) {
+    if (spec.brief) this.setBrief(spec.brief);
+    if (!this.brief?.confirmed) throw new Error('brief_required: describe the project first (objective + expected deliverables), then choose items');
     const { items, pipelines } = this.scan(true);
     if (spec.host) { if (!this.cfg.hosts[spec.host]) throw new Error(`unknown host ${spec.host}`); this.host = spec.host; this.pinned = true; }
     const sels = spec.items || [];
@@ -868,6 +906,7 @@ function serve(app, { port = 0 } = {}) {
   app.on('run', (r) => bcast('run', r));
   app.on('settings', (s) => bcast('settings', s));
   app.on('proposal', (p) => bcast('proposal', p));
+  app.on('brief', (b) => bcast('brief', b));
 
   const readBody = (req) => new Promise((resolve, reject) => {
     let n = 0; const chunks = [];
@@ -923,8 +962,9 @@ function serve(app, { port = 0 } = {}) {
 
       switch (route) {
         case 'open': return send(res, 200, app.open(body));
+        case 'brief': { if (body && (body.goal !== undefined || body.deliverables !== undefined)) app.setBrief(body); return send(res, 200, { brief: app.pubBrief() }); }
         case 'plan': return send(res, 200, { proposal: app.plan(body) });
-        case 'validate': { const pub = app.validate(body); if (body.run) app.runner.runAll().catch(() => {}); return send(res, 200, { pipeline: pub }); }
+        case 'validate': { if (body.run) app.armRun(body.brief); const pub = app.validate(body); if (body.run) app.runner.runAll().catch(() => {}); return send(res, 200, { pipeline: pub }); }
         case 'cancel': app.cancel(); return send(res, 200, { cancelled: true });
         case 'pipeline': return send(res, 200, { pipeline: app.replace(body.pipeline) });
         case 'host': app.setHost(body.host); return send(res, 200, app.settings());
@@ -932,6 +972,7 @@ function serve(app, { port = 0 } = {}) {
         case 'rescan': return send(res, 200, { ok: (app.scan(true), true), ...(() => { const s = app.snapshot(); return { items: s.items, pipelines: s.pipelines }; })() });
         case 'run': {
           if (!app.pipeline) return send(res, 400, { error: 'no pipeline loaded' });
+          app.armRun(body.brief);
           const r = app.runner;
           const p = body.all ? r.runAll() : body.from ? r.runFrom(String(body.from)) : body.node ? r.runOne(String(body.node)) : null;
           if (!p) return send(res, 400, { error: 'specify node, from or all' });
@@ -1048,6 +1089,22 @@ function askYes(q) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => rl.question(q, (a) => { rl.close(); resolve(/^(y|yes|o|oui)$/i.test(a.trim())); }));
 }
+function askLine(q, def) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => rl.question(def ? `${q}[${clip(def, 60)}] ` : q, (a) => { rl.close(); resolve(a.trim() || def || ''); }));
+}
+/** Brief from flags, or asked in the terminal (previous brief offered as default). Refuses in non-interactive mode. */
+async function resolveBrief(args, cur) {
+  const g = args.goal ?? args.objectif, d = args.deliverables ?? args.livrables;
+  if (g && d && g !== true && d !== true) return { goal: String(g), deliverables: String(d) };
+  if (!process.stdin.isTTY) throw new Error(tr('needbrief'));
+  console.log('\n' + tr('brief_head'));
+  const goal = await askLine(tr('brief_goal'), g && g !== true ? g : cur?.goal);
+  const deliverables = await askLine(tr('brief_del'), d && d !== true ? d : cur?.deliverables);
+  if (!goal || !deliverables) throw new Error(tr('needbrief'));
+  return { goal, deliverables };
+}
+const currentBrief = async (lock) => (await callServer(lock, 'POST', 'brief', {}).catch(() => ({}))).brief;
 function itemsFromArgs(args) { return [...splitItems(args.items), ...args._.slice(1).flatMap((x) => (/\s/.test(x) ? [x] : splitItems(x)))]; }
 
 async function cmdPlan(args, { openUi = false } = {}) {
@@ -1055,16 +1112,33 @@ async function cmdPlan(args, { openUi = false } = {}) {
   const items = itemsFromArgs(args);
   if (!items.length) throw new Error('flow plan: give the items to plan (--items a,b,c)');
   const lock = await ensureServer(cwd, args);
-  const r = await callServer(lock, 'POST', 'plan', { items, mode: args.mode || 'auto', name: args.name, host: args.host, append: !!args.append, run: !!args.run });
+  const cur = await currentBrief(lock);
+  const brief = (args.goal || args.objectif) ? await resolveBrief(args, cur) : cur?.confirmed ? undefined : await resolveBrief(args, cur);
+  const r = await callServer(lock, 'POST', 'plan', { items, mode: args.mode || 'auto', name: args.name, host: args.host, append: !!args.append, run: !!args.run, brief });
   console.log(renderPlan(r.proposal));
   if (openUi) { const url = `http://127.0.0.1:${lock.port}/?t=${lock.token}`; console.log(`\nflow ▸ ${url}\n${tr('waiting')}`); if (!args['no-open']) openBrowser(url); }
   return { lock, proposal: r.proposal };
+}
+/** Run launch gate: the brief is re-confirmed at every launch (flags count as confirmation; terminal asks; otherwise refuse). */
+async function runBrief(args, lock) {
+  const cur = await currentBrief(lock);
+  if ((args.goal || args.objectif) && (args.deliverables || args.livrables)) return resolveBrief(args, cur);
+  if (process.stdin.isTTY && cur?.goal) { console.log('\n' + tr('brief_run', cur.goal, cur.deliverables)); if (await askYes(tr('brief_ok'))) return { goal: cur.goal, deliverables: cur.deliverables }; }
+  return resolveBrief({ ...args, goal: undefined, deliverables: undefined }, cur);
+}
+async function cmdBrief(args) {
+  const lock = await ensureServer(path.resolve(args.cwd || process.cwd()), args);
+  const cur = await currentBrief(lock);
+  if (!args.goal && !args.objectif && !args.deliverables && !args.livrables && !process.stdin.isTTY) { console.log(cur?.goal ? tr('brief_run', cur.goal, cur.deliverables) : tr('needbrief')); return; }
+  const b = await resolveBrief(args, cur);
+  await callServer(lock, 'POST', 'brief', b); console.log(tr('briefset'));
 }
 async function cmdValidate(args) {
   const cwd = path.resolve(args.cwd || process.cwd());
   const lock = await liveLock(cwd);
   if (!lock) throw new Error(tr('nosrv'));
-  const r = await callServer(lock, 'POST', 'validate', { exclude: splitItems(args.exclude), run: !!args.run }).catch((e) => { throw new Error(/no pending/.test(e.message) ? tr('noplan') : e.message); });
+  const brief = args.run ? await runBrief(args, lock) : undefined;
+  const r = await callServer(lock, 'POST', 'validate', { exclude: splitItems(args.exclude), run: !!args.run, brief }).catch((e) => { throw new Error(/no pending/.test(e.message) ? tr('noplan') : e.message); });
   const url = `http://127.0.0.1:${lock.port}/?t=${lock.token}`;
   console.log(`${tr('validated')}: '${r.pipeline.name}'  ${r.pipeline.nodes.length} ${tr('nodes')}  ${pipelineShape(r.pipeline)}\nflow ▸ ${url}`);
   if (!args['no-open']) openBrowser(url);
@@ -1092,7 +1166,7 @@ async function cmdOpen(args) {
   if (spec.items?.length && !spec.load) { await cmdPlan(args, { openUi: true }); return; } // items → plan first, validated in the app
   const lock = await ensureServer(cwd, args);
   const r = await callServer(lock, 'POST', 'open', spec);
-  if (args.run && r.pipeline) await callServer(lock, 'POST', 'run', { all: true });
+  if (args.run && r.pipeline) await callServer(lock, 'POST', 'run', { all: true, brief: await runBrief(args, lock) });
   const url = `http://127.0.0.1:${lock.port}/?t=${lock.token}`;
   const opened = args['no-open'] ? null : openBrowser(url);
   const p = r.pipeline;
@@ -1124,6 +1198,8 @@ async function cmdRun(args) {
   else if (args.import) spec.import = args.import;
   else spec.items = itemsFromArgs(args);
   if (args.approve) app.autoApprove = true;
+  let brief0 = null;
+  if (spec.items?.length) { brief0 = await resolveBrief(args, app.brief); app.setBrief(brief0); } // brief first, then items
   let r = app.open(spec);
   if (r.proposal) { // items were selected: the plan must be validated before anything is built or run
     console.log(renderPlan(r.proposal));
@@ -1132,6 +1208,10 @@ async function cmdRun(args) {
     r = { pipeline: app.validate({}) };
   }
   if (!r.pipeline) throw new Error('nothing to run');
+  { // every run needs the project brief (objective + deliverables)
+    const cur = app.brief; if (!args.goal && !args.objectif && process.stdin.isTTY && cur?.goal) console.log('\n' + tr('brief_run', cur.goal, cur.deliverables));
+    app.armRun(brief0 || await resolveBrief(args, cur));
+  }
   console.log(`flow ▸ running '${r.pipeline.name}' via ${app.host}  ${pipelineShape(r.pipeline)}`);
   app.on('log', (l) => process.stdout.write(l.s === "sys" ? `\x1b[36m[${l.n}] ${l.t}\x1b[0m\n` : l.s === "err" ? `\x1b[31m[${l.n}] ${l.t}\x1b[0m\n` : `[${l.n}] ${l.t}\n`));
   app.on('state', (s) => { if (['done', 'error', 'skipped', 'stopped'].includes(s.status)) console.log(`  ${s.status === 'done' ? '✓' : '✗'} ${s.node} ${s.status}`); });
@@ -1179,11 +1259,12 @@ function agentBody(host, F) {
     '',
     'LANGUAGE: always answer the user in French, with simple everyday words (no jargon): say "étapes" for nodes, "enchaînement" for pipeline, "en même temps" for parallel, "assistant IA" for host CLI. Assume the user is a beginner.',
     '1. Read the user request (below).',
+    `1b. MANDATORY PROJECT BRIEF, FIRST (before listing or choosing any item, and again before EVERY run, even a single skill or an existing pipeline): ask the user in chat (a) the general prompt of the target project and the expected objective, (b) the deliverables expected after the run. Never invent or reuse them silently: if a previous brief exists (\`${F} brief\` prints it), show it and ask to confirm or edit. Pass the answers with \`--goal \"…\" --deliverables \"…\"\` on EVERY \`plan\`, \`validate --run\`, \`open --load … --run\`, \`go\` and \`run\` command (they are refused without it).`,
     `2. It names an existing, already-orchestrated pipeline (see PIPELINES in the list) → run \`${cmd} --load "<name>"\` (shown exactly as saved or as the workflow file defines it). No plan needed.`,
     `3. It names items (skills, commands, scripts, references, file paths, URLs or raw shell commands) → FIRST propose a plan: run \`${F} plan --host ${host} --items "a,b,c" --mode auto\`. This builds NOTHING; it prints the proposed plan (steps, parallel groups, why each is placed there).`,
     '   - Use `--mode seq` when the user gave an order or says "then"; `--mode par` for "in parallel"; otherwise `auto` (infers plan → build → verify → ship → report, parallel inside a stage).',
     '4. MANDATORY VALIDATION: show the plan to the user in chat (compact: numbered steps, ∥ for parallel, one-line reason) and ask them to validate it (use the ask-the-user tool if you have one: Validate / Change order or mode / Remove a step / Cancel). Do NOT build, open or run anything before an explicit yes. If they want changes, re-run step 3 with adjusted items or mode (or pass `--exclude <step-id>` at validation), and show the new plan.',
-    `5. Only after the explicit yes: run \`${F} validate --host ${host}\` (add \`--run\` only if they asked to run it right away). It builds the pipeline and opens the app. If they decline: \`${F} cancel\`.`,
+    `5. Only after the explicit yes: run \`${F} validate --host ${host}\` (add \`--run --goal \"…\" --deliverables \"…\"\` only if they asked to run it right away). It builds the pipeline and opens the app. If they decline: \`${F} cancel\`.`,
     '6. The request is empty or vague → show the list above grouped by type (names only, compact) and ask which skills / scripts / references or which existing pipeline to use, then continue at step 3. If they prefer to pick in the app, run `' + cmd + '` (the app also requires validating the plan).',
     '7. After validation, reply in at most 3 lines: the URL, the pipeline shape it printed, and (in French) "clique sur une étape pour la lancer · « Tout lancer » lance tout · Maj+clic lance à partir d\'une étape".',
     `8. If asked later what happened, run \`${F} status\`.`,
@@ -1249,7 +1330,7 @@ function cmdUpdate(args) {
   spawnSync(process.execPath, [path.join(HERE, 'flow.mjs'), 'install', ...(args.host ? ['--host', args.host] : []), ...(args.lang ? ['--lang', args.lang] : [])], { stdio: 'inherit' });
 }
 
-const KNOWN = new Set(['list', 'open', 'go', 'plan', 'validate', 'cancel', 'run', 'status', 'doctor', 'install', 'uninstall', 'update', 'stop', 'serve', 'url', 'help']);
+const KNOWN = new Set(['list', 'open', 'go', 'brief', 'plan', 'validate', 'cancel', 'run', 'status', 'doctor', 'install', 'uninstall', 'update', 'stop', 'serve', 'url', 'help']);
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.lang === 'fr' || args.lang === 'en') LANG = args.lang;
@@ -1262,6 +1343,7 @@ async function main() {
     case 'list': { const app = new App(cwd, { host: args.host }); printList(app.snapshot(), args); break; }
     case 'open': await cmdOpen(args); break;
     case 'go': await cmdGo(args); break;
+    case 'brief': await cmdBrief(args); break;
     case 'plan': await cmdPlan(args); break;
     case 'validate': await cmdValidate(args); break;
     case 'cancel': await cmdCancel(args); break;
