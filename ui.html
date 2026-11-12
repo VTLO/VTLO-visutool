@@ -248,14 +248,15 @@ const HOST_TAG = { claude: 'c', gemini: 'g', agy: 'a' };
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TAU = Math.PI * 2;
 
+const TOKEN = document.querySelector('meta[name=flow-token]')?.content || '';
 const S = { pipeline: null, states: {}, items: [], pipelines: [], host: 'claude', hosts: {}, autoApprove: false,
   sel: null, selected: new Map(), tab: 'log', filterSel: false, startedAt: 0 };
 
 /* ───────── api ───────── */
 async function api(route, body) {
   const r = await fetch('/api/' + route, body !== undefined
-    ? { method: 'POST', headers: { 'content-type': 'application/json', 'x-flow': '1' }, body: JSON.stringify(body) }
-    : { headers: { 'x-flow': '1' } });
+    ? { method: 'POST', headers: { 'content-type': 'application/json', 'x-flow': '1', 'x-flow-token': TOKEN }, body: JSON.stringify(body) }
+    : { headers: { 'x-flow': '1', 'x-flow-token': TOKEN } });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || r.statusText);
   return j;
@@ -691,7 +692,7 @@ async function resync() {
   if (!$('#log').childElementCount) (s.logs || []).forEach(pushLog);
 }
 function connect() {
-  const es = new EventSource('/api/events');
+  const es = new EventSource('/api/events?t=' + encodeURIComponent(TOKEN));
   es.onopen = () => resync().catch(() => {});
   es.addEventListener('pipeline', (e) => { applyPipeline(JSON.parse(e.data)); api('state').then((s) => { S.states = s.states || {}; S.pipelines = s.pipelines; paintStates(); renderPalette(); }).catch(() => {}); });
   es.addEventListener('settings', (e) => applySettings(JSON.parse(e.data)));

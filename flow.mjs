@@ -6,7 +6,7 @@
    flow list    [--compact|--json] [--type skill,command,script,ref,pipeline]
    flow open    [--load NAME | --items a,b,c | --import FILE.md] [--mode auto|seq|par]
    flow run     (same selectors as open, headless: runs the pipeline in this terminal)
-   flow status | stop | doctor | install | uninstall | help
+   flow url | status | stop | doctor | install | uninstall | help
    ───────────────────────────────────────────────────────────────────────────── */
 import http from 'node:http';
 import fs from 'node:fs';
@@ -740,11 +740,11 @@ function serve(app, { port = 0 } = {}) {
   const clients = new Set();
   let actualPort = 0;
   const cookieName = () => `flow_t_${actualPort}`;
-  const okToken = (cookieHeader) => {
-    const m = new RegExp(`(?:^|;\\s*)${cookieName()}=([^;]+)`).exec(cookieHeader || '');
-    if (!m) return false;
-    const a = Buffer.from(m[1]), b = Buffer.from(token);
-    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  const same = (a) => { const x = Buffer.from(String(a || '')), y = Buffer.from(token); return x.length === y.length && crypto.timingSafeEqual(x, y); };
+  // token accepted from header (UI fetches), query (?t=, EventSource + first page load) or cookie (reload fallback)
+  const okToken = (req, url) => {
+    const m = new RegExp(`(?:^|;\\s*)${cookieName()}=([^;]+)`).exec(req.headers.cookie || '');
+    return same(req.headers['x-flow-token']) || same(url.searchParams.get('t')) || !!(m && same(m[1]));
   };
   const send = (res, code, body, type = 'application/json') => { res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store' }); res.end(typeof body === 'string' ? body : JSON.stringify(body)); };
   const bcast = (event, data) => { const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`; for (const r of clients) r.write(msg); };
@@ -767,16 +767,17 @@ function serve(app, { port = 0 } = {}) {
       if (![`127.0.0.1:${actualPort}`, `localhost:${actualPort}`, `[::1]:${actualPort}`].includes(host)) return send(res, 403, 'bad host', 'text/plain');
 
       if (url.pathname === '/') {
-        if (url.searchParams.get('t') === token) {
-          res.writeHead(302, { 'set-cookie': `${cookieName()}=${token}; Path=/; HttpOnly; SameSite=Strict`, location: '/' });
-          return res.end();
+        if (!okToken(req, url)) {
+          res.writeHead(403, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+          return res.end('<!doctype html><meta name=viewport content="width=device-width,initial-scale=1"><body style="background:#06080b;color:#cfd9e2;font:14px/1.6 ui-monospace,monospace;padding:28px"><b style="color:#35e8f5">VTLO-visutool</b><p>Access token missing or expired.</p><p>In your terminal run <code style="color:#35e8f5">flow url</code> (or <code style="color:#35e8f5">flow open</code>) and open the full URL it prints, including <code>?t=…</code>.</p>');
         }
-        if (!okToken(req.headers.cookie)) return send(res, 403, 'Open the URL printed by `flow open` (it carries a one-time access token).', 'text/plain');
-        return send(res, 200, fs.readFileSync(path.join(HERE, 'ui.html'), 'utf8'), 'text/html; charset=utf-8');
+        const html = fs.readFileSync(path.join(HERE, 'ui.html'), 'utf8').replace('<head>', `<head><meta name="flow-token" content="${token}">`);
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'set-cookie': `${cookieName()}=${token}; Path=/; HttpOnly; SameSite=Lax` });
+        return res.end(html);
       }
       if (url.pathname === '/bg.jpg') { res.writeHead(200, { 'content-type': 'image/jpeg', 'cache-control': 'max-age=3600' }); return res.end(fs.readFileSync(path.join(HERE, 'bg.jpg'))); }
       if (!url.pathname.startsWith('/api/')) return send(res, 404, 'not found', 'text/plain');
-      if (!okToken(req.headers.cookie)) return send(res, 401, { error: 'unauthorized' });
+      if (!okToken(req, url)) return send(res, 401, { error: 'unauthorized' });
       const route = url.pathname.slice(5);
 
       if (req.method === 'GET') {
@@ -844,7 +845,7 @@ function callServer(lock, method, route, body) {
   return new Promise((resolve, reject) => {
     const data = body ? JSON.stringify(body) : null;
     const req = http.request({ host: '127.0.0.1', port: lock.port, path: `/api/${route}`, method, timeout: 8000,
-      headers: { cookie: `flow_t_${lock.port}=${lock.token}`, 'x-flow': '1', ...(data ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(data) } : {}) } }, (res) => {
+      headers: { 'x-flow-token': lock.token, 'x-flow': '1', ...(data ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(data) } : {}) } }, (res) => {
       const chunks = []; res.on('data', (c) => chunks.push(c));
       res.on('end', () => { let j; try { j = JSON.parse(Buffer.concat(chunks).toString()); } catch { j = {}; } res.statusCode < 300 ? resolve(j) : reject(new Error(j.error || `HTTP ${res.statusCode}`)); });
     });
@@ -1059,7 +1060,7 @@ const HELP = `VTLO-visutool ${VERSION} — materialize any workflow / pipeline /
   flow open    [--load NAME] [--items a,b,c] [--import wf.md] [--mode auto|seq|par] [--name N] [--host H] [--run] [--no-open]
   flow run     [NAME | --items a,b,c | --import wf.md] [--approve]      headless, no UI
   flow list    [--compact|--json|--desc] [--type skill,command,script,ref,pipeline]
-  flow status | stop | doctor | uninstall | serve [--port N]
+  flow url | status | stop | doctor | uninstall | serve [--port N]
 
 Config (optional): ~/.flow/config.json or <project>/.flow/config.json — see README.`;
 
@@ -1075,6 +1076,7 @@ async function main() {
     case 'doctor': cmdDoctor(args); break;
     case 'install': cmdInstall(args); break;
     case 'uninstall': cmdInstall(args, true); break;
+    case 'url': { const l = await liveLock(cwd); if (!l) { console.log('no flow server running — run: flow open'); break; } const u = `http://127.0.0.1:${l.port}/?t=${l.token}`; console.log(u); if (!args['no-open']) openBrowser(u); break; }
     case 'stop': { const l = await liveLock(cwd); if (l) { await callServer(l, 'POST', 'shutdown', {}).catch(() => {}); console.log('stopped'); } else console.log('no server running'); break; }
     case 'serve': { const app = new App(cwd, { host: args.host }); const s = await serve(app, { port: Number(args.port) || 0 }); if (process.stdout.isTTY) console.log(s.url); break; }
     default: console.log(HELP);

@@ -27,6 +27,7 @@ In the app: **click** a node = run it (click again = stop) · **shift-click** = 
 Palette: tick items → wand = new pipeline, + = append. Free input accepts shell commands, `?agent prompt`, URLs, paths.
 
 ## CLI
+    flow url   # reprint/reopen the access URL if you lost it (403 page)
     flow list [--compact|--json|--desc]   flow open [--load N|--items a,b|--import wf.md] [--mode auto|seq|par]
     flow run  [NAME|--items …] [--approve] (headless)   flow status | stop | doctor | uninstall
 
@@ -47,5 +48,5 @@ Headless runs soft-deny edits unless approved: the shield button (or `--approve`
       "hosts": { "agy": { "bin": "agy", "args": ["-p","{prompt}"], "pty": "auto", "extra": ["--model","…"] } } }
 
 ## Security
-Server binds 127.0.0.1 only, per-launch token cookie (SameSite=Strict), Host/Origin checks, custom header on POST.
+Server binds 127.0.0.1 only, per-launch access token (`?t=` in the URL, sent as a header by the app — no cookie needed), Host/Origin checks, custom header on POST.
 Destructive-looking scripts (rm -r, sudo, git push …) ask for confirmation in the UI.
