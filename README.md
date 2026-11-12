@@ -5,6 +5,9 @@ Every node click runs the **real command** through your CLI (Claude Code, Gemini
 Zero dependencies — Node ≥ 18. Works on Linux, macOS, Termux.
 
 ## Install
+    sh install-agy.sh    # one-shot for Antigravity CLI (agy): checks Node/pty helper, installs engine + /flow skill & workflow (Termux ok)
+
+Or by hand:
     node flow.mjs install                 # user scope: /flow in claude + gemini + agy
     node flow.mjs install --host agy      # one CLI only
     node flow.mjs install --scope project # into ./.claude ./.gemini ./.agents
