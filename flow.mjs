@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* ─────────────────────────────────────────────────────────────────────────────
    VTLO-visutool (/flow) — turn any workflow / pipeline / set of skills into a clickable 3D web app.
-   Works with agy (Antigravity CLI), gemini and claude. Zero dependencies, Node >= 18.
+   Works with agy (Antigravity CLI) and claude (Claude Code). Zero dependencies, Node >= 18.
 
    flow list    [--compact|--json] [--type skill,command,script,ref,pipeline]
    flow open    [--load NAME | --items a,b,c | --import FILE.md] [--mode auto|seq|par]
@@ -47,7 +47,7 @@ Easy:
   flow                          open the app (pick items in the palette)
   flow a b "npm run x"          PROPOSE a plan for these skills / scripts / files / commands; you validate it, then it is built
   flow go a b c                 same, and run it right after you validate
-  flow install                  add /flow to every CLI found (claude, gemini, agy)
+  flow install                  add /flow to every CLI found (agy = Antigravity CLI, claude)
   flow update                   pull the latest version and reinstall
 
 More:
@@ -84,7 +84,7 @@ Facile :
   flow                          ouvre l'appli (choisis les éléments dans la palette)
   flow a b "npm run x"          PROPOSE un plan pour ces skills / scripts / fichiers / commandes ; tu le valides, puis il est construit
   flow go a b c                 pareil, et le lance juste après ta validation
-  flow install                  ajoute /flow à chaque CLI détecté (claude, gemini, agy)
+  flow install                  ajoute /flow à chaque CLI détecté (agy = Antigravity CLI, claude)
   flow update                   récupère la dernière version et réinstalle
 
 Plus :
@@ -186,7 +186,6 @@ const DEFAULTS = {
   timeoutSec: 900,
   hosts: {
     claude: { bin: 'claude', args: ['-p', '{prompt}'], approve: ['--permission-mode', 'acceptEdits'], extra: [], pty: false, commandInvoke: 'slash' },
-    gemini: { bin: 'gemini', args: ['-p', '{prompt}'], approve: ['--yolo'], extra: [], pty: false, commandInvoke: 'expand' },
     agy: { bin: 'agy', args: ['-p', '{prompt}'], approve: ['--dangerously-skip-permissions'], extra: [], pty: 'auto', commandInvoke: 'slash' },
   },
 };
@@ -195,17 +194,15 @@ const loadConfig = (cwd) => deepMerge(DEFAULTS, readJson(path.join(HOME, '.flow'
 function detectHost(cfg, wanted) {
   if (wanted && cfg.hosts[wanted]) return wanted;
   if (cfg.host && cfg.hosts[cfg.host]) return cfg.host;
-  if (process.env.GEMINI_CLI) return 'gemini';
   if (process.env.CLAUDECODE) return 'claude';
-  for (const h of ['agy', 'claude', 'gemini']) if (which(cfg.hosts[h].bin)) return h;
-  return 'claude';
+  for (const h of ['agy', 'claude']) if (which(cfg.hosts[h].bin)) return h;
+  return 'agy';
 }
 
 /* ═══════════════════════════ discovery ═══════════════════════════ */
 function skillRoots(cwd) {
   return [
     ['claude', path.join(cwd, '.claude/skills')], ['claude', path.join(HOME, '.claude/skills')],
-    ['gemini', path.join(cwd, '.gemini/skills')], ['gemini', path.join(HOME, '.gemini/skills')],
     ['agy', path.join(cwd, '.agents/skills')], ['agy', path.join(cwd, '.agent/skills')],
     ['agy', path.join(HOME, '.agents/skills')], ['agy', path.join(HOME, '.gemini/antigravity/skills')],
     ['agy', path.join(HOME, '.gemini/config/skills')],
@@ -247,8 +244,7 @@ function scanItems(cwd) {
   }
 
   // commands
-  const cmdDirs = [['claude', path.join(cwd, '.claude/commands'), '.md'], ['claude', path.join(HOME, '.claude/commands'), '.md'],
-    ['gemini', path.join(cwd, '.gemini/commands'), '.toml'], ['gemini', path.join(HOME, '.gemini/commands'), '.toml']];
+  const cmdDirs = [['claude', path.join(cwd, '.claude/commands'), '.md'], ['claude', path.join(HOME, '.claude/commands'), '.md']];
   for (const [host, dir, ext] of cmdDirs) {
     for (const f of walk(dir, { depth: 3, ext: [ext], max: 300 })) {
       const name = path.relative(dir, f).slice(0, -ext.length).split(path.sep).join(':');
@@ -1277,7 +1273,6 @@ function installTargets(scope, cwd, hosts) {
   const root = scope === 'project' ? cwd : HOME;
   const t = [];
   if (hosts.includes('claude')) t.push({ host: 'claude', file: path.join(root, '.claude/commands/flow.md'), kind: 'claude' });
-  if (hosts.includes('gemini')) t.push({ host: 'gemini', file: path.join(root, '.gemini/commands/flow.toml'), kind: 'gemini' });
   if (hosts.includes('agy')) {
     const skillRoot = scope === 'project' ? path.join(cwd, '.agents/skills') : (isDir(path.join(HOME, '.agents')) && !isDir(path.join(HOME, '.gemini/antigravity')) ? path.join(HOME, '.agents/skills') : path.join(HOME, '.gemini/antigravity/skills'));
     const wfRoot = scope === 'project' ? path.join(cwd, '.agents/workflows') : path.join(HOME, '.gemini/antigravity/global_workflows');
@@ -1292,8 +1287,6 @@ function renderCommand(kind, F, host) {
   switch (kind) {
     case 'claude':
       return `---\ndescription: Visual orchestrator — open any workflow, pipeline or group of skills as a clickable 3D app\nargument-hint: [pipeline | skill, script, ref, …]\nallowed-tools: Bash(node:*)\n---\nAvailable items (live scan):\n!\`${listing}\`\n\n${body}\n\nUser request: $ARGUMENTS\n`;
-    case 'gemini':
-      return `description = "Visual orchestrator — open any workflow, pipeline or group of skills as a clickable 3D app"\nprompt = """\nAvailable items (live scan):\n!{${listing}}\n\n${body}\n\nUser request: {{args}}\n"""\n`;
     case 'agy-skill':
       return `---\nname: flow\ndescription: Visual orchestrator. Use when the user types /flow or asks to visualize, group or orchestrate workflows, pipelines, skills, scripts or references as a clickable app.\n---\n# flow\nFirst run \`${listing}\` to see the available items.\n\n${body}\n`;
     default:
@@ -1303,8 +1296,11 @@ function renderCommand(kind, F, host) {
 function cmdInstall(args, uninstall = false) {
   const cwd = path.resolve(args.cwd || process.cwd());
   const scope = args.scope === 'project' ? 'project' : 'user';
-  const found = ['claude', 'gemini', 'agy'].filter((h) => which(loadConfig(cwd).hosts[h].bin) || isDir(path.join(HOME, h === 'claude' ? '.claude' : '.gemini')));
-  const hosts = args.host === 'all' ? ['claude', 'gemini', 'agy'] : args.host ? String(args.host).split(',') : (found.length ? found : ['claude', 'gemini', 'agy']);
+  const hasDir = { claude: isDir(path.join(HOME, '.claude')), agy: isDir(path.join(HOME, '.gemini/antigravity')) || isDir(path.join(HOME, '.agents')) };
+  const found = ['agy', 'claude'].filter((h) => which(loadConfig(cwd).hosts[h].bin) || hasDir[h]);
+  const hosts = args.host === 'all' ? ['agy', 'claude'] : args.host ? String(args.host).split(',').map((h) => (h === 'gemini' ? 'agy' : h)) : (found.length ? found : ['agy']);
+  // clean up the obsolete Gemini CLI command we may have installed earlier
+  for (const lf of [path.join(HOME, '.gemini/commands/flow.toml'), path.join(cwd, '.gemini/commands/flow.toml')]) { try { if (/Visual orchestrator/.test(readText(lf, 4000))) { fs.rmSync(lf); console.log(`flow ▸ removed obsolete Gemini CLI command ${lf}`); } } catch { /* absent */ } }
   const engineDir = scope === 'project' ? path.join(cwd, '.flow', 'bin') : path.join(HOME, '.flow');
   const F = `node "${path.join(engineDir, 'flow.mjs')}"`;
   if (!uninstall) {
@@ -1330,9 +1326,10 @@ function cmdUpdate(args) {
   spawnSync(process.execPath, [path.join(HERE, 'flow.mjs'), 'install', ...(args.host ? ['--host', args.host] : []), ...(args.lang ? ['--lang', args.lang] : [])], { stdio: 'inherit' });
 }
 
+function normHost(args) { if (args.host === 'gemini') { console.error('flow ▸ Gemini CLI is obsolete — using agy (Antigravity CLI)'); args.host = 'agy'; } return args; }
 const KNOWN = new Set(['list', 'open', 'go', 'brief', 'plan', 'validate', 'cancel', 'run', 'status', 'doctor', 'install', 'uninstall', 'update', 'stop', 'serve', 'url', 'help']);
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
+  const args = normHost(parseArgs(process.argv.slice(2)));
   if (args.lang === 'fr' || args.lang === 'en') LANG = args.lang;
   if (args.help || args.h) args._.unshift('help');
   let cmd = args._[0];

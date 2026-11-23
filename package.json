@@ -1,7 +1,7 @@
 {
   "name": "vtlo-visutool",
   "version": "1.0.0",
-  "description": "Visual 3D orchestrator (/flow) for Antigravity CLI, Gemini CLI and Claude Code",
+  "description": "Visual 3D orchestrator (/flow) for Antigravity CLI and Claude Code",
   "type": "module",
   "bin": { "flow": "flow.mjs", "visutool": "flow.mjs" },
   "files": ["flow.mjs", "ui.html", "bg.jpg", "install-agy.sh", "README.md", "README.fr.md", "docs"],

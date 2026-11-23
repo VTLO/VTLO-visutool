@@ -5,24 +5,24 @@
 **Quick install (one line)**
 
     git clone https://github.com/VTLO/VTLO-visutool && sh VTLO-visutool/install-agy.sh        # agy
-    git clone https://github.com/VTLO/VTLO-visutool && node VTLO-visutool/flow.mjs install    # claude + gemini + agy
+    git clone https://github.com/VTLO/VTLO-visutool && node VTLO-visutool/flow.mjs install    # agy (Antigravity CLI) + claude
     curl -fsSL https://raw.githubusercontent.com/VTLO/VTLO-visutool/main/install-agy.sh | sh  # no clone needed (public repo)
 
 
 Turns any workflow, pipeline or group of skills / commands / scripts / references into a clickable 3D web app.
-Every node click runs the **real command** through your CLI (Claude Code, Gemini CLI, Antigravity `agy`).
+Every node click runs the **real command** through your CLI (Antigravity CLI `agy`, Claude Code).
 Zero dependencies — Node ≥ 18. Works on Linux, macOS, Termux.
 
 ## Install
     sh install-agy.sh    # one-shot for Antigravity CLI (agy): checks Node/pty helper, installs engine + /flow skill & workflow (Termux ok)
 
 Or by hand:
-    node flow.mjs install                 # user scope: /flow in claude + gemini + agy
+    node flow.mjs install                 # user scope: /flow in agy + claude
     node flow.mjs install --host agy      # one CLI only
-    node flow.mjs install --scope project # into ./.claude ./.gemini ./.agents
+    node flow.mjs install --scope project # into ./.agents ./.claude
 
 Files written: `~/.flow/{flow.mjs,ui.html,bg.jpg}`, `~/.claude/commands/flow.md`,
-`~/.gemini/commands/flow.toml`, agy skill `~/.gemini/antigravity/skills/flow/SKILL.md` + workflow `global_workflows/flow.md`.
+agy skill `~/.gemini/antigravity/skills/flow/SKILL.md` + workflow `global_workflows/flow.md`.
 
 ## Use
 Type `/flow` in the CLI. It lists what it found and asks which skills / scripts / refs (or which existing pipeline) you want.
@@ -50,7 +50,7 @@ The UI is **French by default** (EN via the FR/EN button or `FLOW_LANG=en`), wit
 |---|---|
 | script | `sh -c "<command>"` in the project dir |
 | skill | `<cli> -p "Use the \"x\" skill …"` + context (reference files, upstream output files) |
-| command | `<cli> -p "/x args"` (Gemini: TOML expanded locally) |
+| command | `<cli> -p "/x args"`  |
 | prompt | `<cli> -p "<text>"` |
 | ref | context for downstream nodes; click previews it |
 Outputs land in `.flow/runs/<stamp>/`. `agy -p` can hang without a TTY, so agy runs inside a pty (`script`).

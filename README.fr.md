@@ -5,11 +5,11 @@
 **Installation rapide (une ligne)**
 
     git clone https://github.com/VTLO/VTLO-visutool && sh VTLO-visutool/install-agy.sh        # agy
-    git clone https://github.com/VTLO/VTLO-visutool && node VTLO-visutool/flow.mjs install    # claude + gemini + agy (détectés)
+    git clone https://github.com/VTLO/VTLO-visutool && node VTLO-visutool/flow.mjs install    # agy (Antigravity CLI) + claude (détectés)
     curl -fsSL https://raw.githubusercontent.com/VTLO/VTLO-visutool/main/install-agy.sh | sh  # sans clone (dépôt public)
 
 Transforme n'importe quel workflow, pipeline ou groupe de skills / commandes / scripts / références en appli web 3D cliquable.
-Chaque clic sur un nœud lance la **vraie commande** dans ton CLI (Claude Code, Gemini CLI, Antigravity `agy`).
+Chaque clic sur un nœud lance la **vraie commande** dans ton CLI (Antigravity CLI `agy`, Claude Code).
 Zéro dépendance — Node ≥ 18. Linux, macOS, Termux.
 
 ## Utilisation simple
@@ -39,7 +39,7 @@ Dans l'appli : **clic** sur un nœud = le lancer (re-clic = l'arrêter) · **maj
 |---|---|
 | script | `sh -c "<commande>"` dans le dossier du projet |
 | skill | `<cli> -p "Utilise le skill x …"` + contexte (fichiers de référence, sorties des étapes amont) |
-| commande | `<cli> -p "/x args"` (Gemini : TOML développé localement) |
+| commande | `<cli> -p "/x args"`  |
 | prompt | `<cli> -p "<texte>"` |
 | réf | contexte pour les nœuds suivants ; un clic l'affiche |
 
