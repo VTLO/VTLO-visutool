@@ -2,6 +2,8 @@
 
 # VTLO-visutool  (`/flow`)  ·  [Français](README.fr.md)
 
+▶ **[Watch the demo video (1 min 35, in French)](docs/VTLO-visutool-demo.mp4)**: install, project brief, first run.
+
 **Quick install (one line)**
 
     git clone https://github.com/VTLO/VTLO-visutool && sh VTLO-visutool/install-agy.sh        # agy
